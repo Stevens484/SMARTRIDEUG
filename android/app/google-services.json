@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "398858755798",
+    "project_id": "smartride-mobileapp001",
+    "storage_bucket": "smartride-mobileapp001.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398858755798:android:08b91bf10b904b6b30b377",
+        "android_client_info": {
+          "package_name": "com.example.smartrideug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "398858755798-ddm49pnamh68fbb92okl2ql1bvkebm53.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmNXXFiqPUH-SspNPRUG11cktszM6Ls7M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398858755798-ddm49pnamh68fbb92okl2ql1bvkebm53.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
