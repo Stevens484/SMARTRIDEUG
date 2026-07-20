@@ -64,15 +64,20 @@ class _HomePageState extends State<HomePage> {
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
-              accountName: const Text('Jane Doe'),
-              accountEmail: const Text('jane.doe@email.com'),
+              accountName: Text(
+                FirebaseAuth.instance.currentUser?.displayName ??
+                    'SmartRide passenger',
+              ),
+              accountEmail: Text(
+                FirebaseAuth.instance.currentUser?.email ?? '',
+              ),
               currentAccountPicture: CircleAvatar(
                 backgroundColor: Theme.of(context).colorScheme.surface,
-                child: Image.asset(
-                  'assets/images/user_avatar.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const Icon(Icons.person, size: 36),
-                ),
+                foregroundImage:
+                    FirebaseAuth.instance.currentUser?.photoURL != null
+                    ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
+                    : null,
+                child: const Icon(Icons.person, size: 36),
               ),
             ),
             ListTile(
@@ -210,8 +215,6 @@ class _HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<_HomeContent> {
   final bool _hasActiveRide = false;
-  String userName = 'Stuart';
-  String userLocation = 'Kampala, Uganda';
 
   Set<Marker> _markersFrom(QuerySnapshot<Map<String, dynamic>> snapshot) =>
       snapshot.docs
@@ -237,6 +240,11 @@ class _HomeContentState extends State<_HomeContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = user?.displayName?.isNotEmpty == true
+        ? user!.displayName!
+        : user?.email?.split('@').first ?? 'SmartRide rider';
+    final userLocation = user?.email ?? 'Your area';
 
     return Container(
       decoration: BoxDecoration(

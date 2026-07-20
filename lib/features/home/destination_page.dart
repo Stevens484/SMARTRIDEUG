@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/features/home/route_details_page.dart';
 
@@ -29,89 +30,95 @@ class DestinationPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Column(
-                  children: [
-                    const Text(
-                      'Suggested Routes',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _RouteCard(
-                      title: 'Route 3',
-                      subtitle: 'Makerere → Wandegeya → Mulago → Ntinda',
-                      distance: '8.2 km',
-                      duration: '24 min',
-                      busesAvailable: 5,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RouteDetailsPage(
-                              title: 'Route 3',
-                              subtitle:
-                                  'Makerere → Wandegeya → Mulago → Ntinda',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    _RouteCard(
-                      title: 'Route 5',
-                      subtitle: 'Makerere → Nakawa → Ntinda',
-                      distance: '9.1 km',
-                      duration: '20 min',
-                      busesAvailable: 3,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RouteDetailsPage(
-                              title: 'Route 5',
-                              subtitle: 'Makerere → Nakawa → Ntinda',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    _RouteCard(
-                      title: 'Route 7',
-                      subtitle: 'Makerere → Kireka → Ntinda',
-                      distance: '11.3 km',
-                      duration: '28 min',
-                      busesAvailable: 2,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RouteDetailsPage(
-                              title: 'Route 7',
-                              subtitle: 'Makerere → Kireka → Ntinda',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Live updates: Bus locations and seat availability are updated in real time.',
-                              ),
-                            ),
-                          ],
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('routes')
+                      .where('active', isEqualTo: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    final routes = snapshot.data!.docs;
+                    if (routes.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Text(
+                          'No active routes are available at the moment.',
                         ),
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        const Text(
+                          'Suggested Routes',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...routes.map((route) {
+                          final data = route.data();
+                          final title = data['name']?.toString() ?? route.id;
+                          final subtitle =
+                              data['subtitle']?.toString() ??
+                              [
+                                data['origin'],
+                                data['destination'],
+                              ].whereType<String>().join(' → ');
+                          final distance =
+                              data['distance']?.toString() ?? 'Unknown';
+                          final duration =
+                              data['duration']?.toString() ?? 'Unknown';
+                          final available =
+                              data['activeBuses']?.toString() ??
+                              data['busCount']?.toString() ??
+                              '0';
+                          return _RouteCard(
+                            title: title,
+                            subtitle: subtitle,
+                            distance: distance,
+                            duration: duration,
+                            busesAvailable: int.tryParse(available) ?? 0,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      RouteDetailsPage(routeId: route.id),
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
+                        const SizedBox(height: 24),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Live updates: Bus locations and seat availability are updated in real time.',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

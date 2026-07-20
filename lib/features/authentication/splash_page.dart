@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
-import 'package:smartrideug/features/admin/admin_dashboard_page.dart';
 import 'package:smartrideug/features/authentication/authentication_page.dart';
-import 'package:smartrideug/features/driver/driver_dashboard_page.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -42,7 +40,11 @@ class _SplashPageState extends State<SplashPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const AdminDashboardPage(),
+                      builder: (_) => const AuthenticationPage(
+                        register: false,
+                        operator: true,
+                        role: 'admin',
+                      ),
                     ),
                   );
                 },
@@ -55,7 +57,11 @@ class _SplashPageState extends State<SplashPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const DriverDashboardPage(),
+                      builder: (_) => const AuthenticationPage(
+                        register: false,
+                        operator: true,
+                        role: 'driver',
+                      ),
                     ),
                   );
                 },
@@ -81,9 +87,13 @@ class _SplashPageState extends State<SplashPage> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - 56),
+                child: IntrinsicHeight(
+                  child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Spacer(),
@@ -133,6 +143,9 @@ class _SplashPageState extends State<SplashPage> {
                   child: const Text('Login'),
                 ),
               ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),

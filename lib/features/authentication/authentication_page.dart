@@ -4,21 +4,35 @@ import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/home/home_page.dart';
 
 class AuthenticationPage extends StatefulWidget {
-  const AuthenticationPage({super.key, this.register = false});
+  const AuthenticationPage({
+    super.key,
+    this.register = false,
+    this.operator = false,
+    this.role = 'driver',
+  });
+
   static const routeName = '/auth';
   final bool register;
+  final bool operator;
+  final String role;
+
   @override
   State<AuthenticationPage> createState() => _AuthenticationPageState();
 }
 
 class _AuthenticationPageState extends State<AuthenticationPage> {
-  final _email = TextEditingController(), _password = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _employeeId = TextEditingController();
   late bool _register = widget.register;
+  late bool _operator = widget.operator;
+  late String _role = widget.role;
   bool _busy = false;
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _employeeId.dispose();
     super.dispose();
   }
 
@@ -33,23 +47,57 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
       );
       return;
     }
+    if (_operator && _employeeId.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a verified employee ID to continue.'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _busy = true);
     try {
       final auth = AuthenticationService();
       if (_register) {
-        await auth.registerWithEmail(_email.text, _password.text);
+        if (_operator) {
+          await auth.registerWithEmail(
+            email: _email.text,
+            password: _password.text,
+            role: _role,
+            employeeId: _employeeId.text,
+          );
+        } else {
+          await auth.registerWithEmail(
+            email: _email.text,
+            password: _password.text,
+            role: 'passenger',
+            employeeId: '',
+          );
+        }
       } else {
-        await auth.signInWithEmail(_email.text, _password.text);
+        if (_operator) {
+          await auth.signInWithEmail(
+            _email.text,
+            _password.text,
+            role: _role,
+            employeeId: _employeeId.text,
+          );
+        } else {
+          await auth.signInWithEmail(_email.text, _password.text);
+        }
       }
-      if (mounted)
+      if (mounted) {
         Navigator.of(
           context,
         ).pushNamedAndRemoveUntil(HomePage.routeName, (_) => false);
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -109,6 +157,27 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),
+                    if (_operator) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _employeeId,
+                        decoration: const InputDecoration(
+                          labelText: 'Employee ID',
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Operator role',
+                          prefixIcon: Icon(Icons.work_outline),
+                        ),
+                        child: Text(
+                          _role == 'admin' ? 'Admin' : 'Driver',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
