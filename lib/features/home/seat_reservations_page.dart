@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:smartrideug/features/home/booking_status_page.dart';
 
 class SeatReservationsPage extends StatelessWidget {
   const SeatReservationsPage({super.key});
@@ -52,28 +53,39 @@ class SeatReservationsPage extends StatelessWidget {
               final status = reservation['status']?.toString() ?? 'Unknown';
 
               return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        route,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                child: InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BookingStatusPage(
+                        bookingId: reservations[index].id,
                       ),
-                      const SizedBox(height: 8),
-                      Text('Bus $bus • Seat(s) $seats'),
-                      const SizedBox(height: 8),
-                      Chip(
-                        label: Text(status),
-                        backgroundColor: status == 'Confirmed'
-                            ? Colors.green
-                            : status == 'Pending'
-                            ? Colors.orange
-                            : Colors.grey,
-                        labelStyle: const TextStyle(color: Colors.white),
-                      ),
-                    ],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          route,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Bus $bus â€¢ Seat(s) $seats'),
+                        const SizedBox(height: 8),
+                        Chip(
+                          label: Text(status),
+                          backgroundColor: status == 'confirmed'
+                              ? Colors.green
+                              : status == 'pending'
+                              ? Colors.orange
+                              : status == 'cancelled'
+                              ? Colors.red
+                              : Colors.grey,
+                          labelStyle: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
