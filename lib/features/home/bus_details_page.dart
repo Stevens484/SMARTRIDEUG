@@ -6,9 +6,15 @@ import 'package:smartrideug/features/home/seat_layout_page.dart';
 
 class BusDetailsPage extends StatelessWidget {
   final String busId;
+  final String routeId;
   final String number;
 
-  const BusDetailsPage({super.key, required this.busId, required this.number});
+  const BusDetailsPage({
+    super.key,
+    required this.busId,
+    required this.routeId,
+    required this.number,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +131,11 @@ class BusDetailsPage extends StatelessWidget {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => SeatLayoutPage(busNumber: number),
+                  builder: (_) => SeatLayoutPage(
+                    busId: busId,
+                    routeId: routeId,
+                    busNumber: number,
+                  ),
                 ),
               );
             },
