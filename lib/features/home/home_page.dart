@@ -1432,13 +1432,6 @@ class _BookingsTab extends StatelessWidget {
           status: 'Waiting for confirmation',
           icon: Icons.hourglass_top,
         ),
-        const SizedBox(height: 16),
-        _StatusCard(
-          title: 'Confirmed ride',
-          subtitle: 'BUS 215 • City Centre → Entebbe',
-          status: 'Reserved seat 16',
-          icon: Icons.event_seat,
-        ),
         const SizedBox(height: 24),
         ElevatedButton(
           onPressed: () => Navigator.of(
