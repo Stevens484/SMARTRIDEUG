@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
-import 'package:smartrideug/features/home/seat_layout_page.dart';
+import 'package:smartrideug/features/home/bus_details_page.dart';
 
 class RouteDetailsPage extends StatelessWidget {
   final String routeId;
@@ -232,6 +232,7 @@ class RouteDetailsPage extends StatelessWidget {
                                     data['status']?.toString() ?? 'On route';
                                 return _BusCard(
                                   busId: doc.id,
+                                  routeId: routeId,
                                   number: busNumber,
                                   plate: data['plate']?.toString() ?? 'Unknown',
                                   eta: eta,
@@ -257,6 +258,7 @@ class RouteDetailsPage extends StatelessWidget {
 
 class _BusCard extends StatefulWidget {
   final String busId;
+  final String routeId;
   final String number;
   final String plate;
   final String eta;
@@ -266,6 +268,7 @@ class _BusCard extends StatefulWidget {
 
   const _BusCard({
     required this.busId,
+    required this.routeId,
     required this.number,
     required this.plate,
     required this.eta,
@@ -299,6 +302,7 @@ class _BusCardState extends State<_BusCard> {
                 MaterialPageRoute(
                   builder: (_) => BusDetailsPage(
                     busId: widget.busId,
+                    routeId: widget.routeId,
                     number: widget.number,
                   ),
                 ),

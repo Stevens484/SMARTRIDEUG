@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:smartrideug/features/home/booking_status_page.dart';
 
 class ConfirmSeatPage extends StatelessWidget {
+  final String busId;
+  final String routeId;
   final String busNumber;
+  final int farePerSeat;
   final List<String> seats;
 
   const ConfirmSeatPage({
     super.key,
+    required this.busId,
+    required this.routeId,
     required this.busNumber,
+    required this.farePerSeat,
     required this.seats,
   });
 
@@ -54,7 +60,7 @@ class ConfirmSeatPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'UGX ${3000 * seats.length}',
+                  'UGX ${farePerSeat * seats.length}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
