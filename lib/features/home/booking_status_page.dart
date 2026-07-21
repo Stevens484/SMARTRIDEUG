@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:smartrideug/features/home/booking_confirmed_page.dart';
 
 class BookingStatusPage extends StatefulWidget {
-  const BookingStatusPage({super.key});
+  final String bookingId;
+
+  const BookingStatusPage({super.key, required this.bookingId});
 
   @override
   State<BookingStatusPage> createState() => _BookingStatusPageState();

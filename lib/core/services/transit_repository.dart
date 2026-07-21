@@ -29,7 +29,7 @@ class TransitRepository {
         .snapshots();
   }
 
-  Future<void> reserveSeats({
+  Future<String> reserveSeats({
     required String busId,
     required String routeId,
     required List<String> seats,
@@ -37,15 +37,15 @@ class TransitRepository {
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Please sign in to reserve a seat.');
+    final busRef = _db.collection('buses').doc(busId);
+    final bookingRef = _db.collection('bookings').doc();
+    final reservationRef = _db.collection('seatReservations').doc();
     await _db.runTransaction((transaction) async {
-      final busRef = _db.collection('buses').doc(busId);
       final bus = await transaction.get(busRef);
       final taken = List<String>.from(bus.data()?['reservedSeats'] ?? const []);
       if (seats.any(taken.contains)) {
         throw StateError('One or more selected seats are no longer available.');
       }
-      final bookingRef = _db.collection('bookings').doc();
-      final reservationRef = _db.collection('seatReservations').doc();
       transaction.update(busRef, {
         'reservedSeats': [...taken, ...seats],
       });
@@ -69,6 +69,7 @@ class TransitRepository {
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
+    return bookingRef.id;
   }
 
   Future<void> updateBusLocation({

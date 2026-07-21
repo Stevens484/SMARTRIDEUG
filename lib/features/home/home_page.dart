@@ -5,7 +5,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:smartrideug/features/authentication/authentication_page.dart';
-import 'package:smartrideug/features/home/booking_status_page.dart';
 import 'package:smartrideug/features/home/destination_page.dart';
 import 'package:smartrideug/features/home/help_support_page.dart';
 import 'package:smartrideug/features/home/payment_method_page.dart';
@@ -106,7 +105,7 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BookingStatusPage()),
+                  MaterialPageRoute(builder: (_) => const SeatReservationsPage()),
                 );
               },
             ),
@@ -1053,7 +1052,7 @@ class _HomeContentState extends State<_HomeContent> {
                         subtitle: 'View all your\nbookings',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const BookingStatusPage(),
+                            builder: (_) => const SeatReservationsPage(),
                           ),
                         ),
                       ),
@@ -1444,7 +1443,7 @@ class _BookingsTab extends StatelessWidget {
         ElevatedButton(
           onPressed: () => Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const BookingStatusPage())),
+          ).push(MaterialPageRoute(builder: (_) => const SeatReservationsPage())),
           child: const Text('Open booking details'),
         ),
       ],
