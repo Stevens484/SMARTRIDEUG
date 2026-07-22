@@ -64,15 +64,11 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
           await auth.registerWithEmail(
             email: _email.text,
             password: _password.text,
-            role: _role,
-            employeeId: _employeeId.text,
           );
         } else {
           await auth.registerWithEmail(
             email: _email.text,
             password: _password.text,
-            role: 'passenger',
-            employeeId: '',
           );
         }
       } else {
@@ -81,7 +77,6 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
             _email.text,
             _password.text,
             role: _role,
-            employeeId: _employeeId.text,
           );
         } else {
           await auth.signInWithEmail(_email.text, _password.text);

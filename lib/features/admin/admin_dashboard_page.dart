@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:smartrideug/core/services/authentication_service.dart';
 import 'package:smartrideug/core/services/report_service.dart';
 
 class AdminDashboardPage extends StatelessWidget {
@@ -30,9 +31,26 @@ class AdminDashboardPage extends StatelessWidget {
     }
   }
 
+  void _openAddStaffSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _AddStaffSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Admin dashboard')),
+    appBar: AppBar(
+      title: const Text('Admin dashboard'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.person_add_alt_1),
+          tooltip: 'Add Staff',
+          onPressed: () => _openAddStaffSheet(context),
+        ),
+      ],
+    ),
     body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('busLocations').snapshots(),
       builder: (context, snapshot) => ListView(
@@ -118,6 +136,13 @@ class AdminDashboardPage extends StatelessWidget {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.person_add_alt_1),
+            title: const Text('Add Staff'),
+            subtitle: const Text('Create driver or admin accounts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _openAddStaffSheet(context),
+          ),
           for (final item in const [
             (Icons.people, 'Drivers'),
             (Icons.directions_bus, 'Buses'),
@@ -173,6 +198,136 @@ class AdminDashboardPage extends StatelessWidget {
       title: Text(text),
       trailing: const Icon(Icons.arrow_forward),
       onTap: action,
+    ),
+  );
+}
+
+class _AddStaffSheet extends StatefulWidget {
+  const _AddStaffSheet();
+
+  @override
+  State<_AddStaffSheet> createState() => _AddStaffSheetState();
+}
+
+class _AddStaffSheetState extends State<_AddStaffSheet> {
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _employeeId = TextEditingController();
+  final _password = TextEditingController();
+  String _role = 'driver';
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _employeeId.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_name.text.trim().isEmpty ||
+        _email.text.trim().isEmpty ||
+        _employeeId.text.trim().isEmpty ||
+        _password.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Fill in name, email, employee ID, and a password of at '
+            'least 6 characters.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await AuthenticationService().createStaffAccount(
+        name: _name.text,
+        email: _email.text,
+        password: _password.text,
+        employeeId: _employeeId.text,
+        role: _role,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Staff account created for ${_name.text}.')),
+        );
+        _name.clear();
+        _email.clear();
+        _employeeId.clear();
+        _password.clear();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not create account: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(
+      left: 24,
+      right: 24,
+      top: 24,
+      bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+    ),
+    child: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Add Staff', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 4),
+          const Text('Create a driver or admin account.'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Full name'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email address'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _employeeId,
+            decoration: const InputDecoration(labelText: 'Employee ID'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _password,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Temporary password'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _role,
+            decoration: const InputDecoration(labelText: 'Role'),
+            items: const [
+              DropdownMenuItem(value: 'driver', child: Text('Driver')),
+              DropdownMenuItem(value: 'admin', child: Text('Admin')),
+            ],
+            onChanged: (value) {
+              if (value != null) setState(() => _role = value);
+            },
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _busy ? null : _submit,
+            child: Text(_busy ? 'Creating...' : 'Create account'),
+          ),
+        ],
+      ),
     ),
   );
 }
