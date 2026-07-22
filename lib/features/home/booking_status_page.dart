@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/features/home/booking_confirmed_page.dart';
 
@@ -19,9 +21,30 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
   DocumentReference<Map<String, dynamic>> get _bookingRef =>
       FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId);
 
+  Future<void> _writeNotification(String title, String body) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': uid,
+        'title': title,
+        'body': body,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      // A missing notification shouldn't break the booking flow itself.
+      debugPrint('Could not write notification: $error');
+    }
+  }
+
   Future<void> _confirmBooking() async {
     try {
       await _bookingRef.update({'status': 'confirmed'});
+      await _writeNotification(
+        'Booking confirmed',
+        'Your seat booking is confirmed. Have a safe trip!',
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -30,9 +53,9 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -82,14 +105,22 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
         }
       });
 
+      await _writeNotification(
+        expired ? 'Reservation expired' : 'Booking cancelled',
+        expired
+            ? 'Your seat reservation expired before you confirmed, so it '
+                  'was released.'
+            : 'You cancelled your seat booking.',
+      );
+
       if (expired && mounted) {
         setState(() => _expired = true);
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
       if (mounted) {
@@ -112,7 +143,9 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
 
             final booking = bookingSnapshot.data!.data();
             if (booking == null) {
-              return const Center(child: Text('This booking is no longer available.'));
+              return const Center(
+                child: Text('This booking is no longer available.'),
+              );
             }
             final status = booking['status']?.toString() ?? 'unknown';
 
