@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/features/home/booking_confirmed_page.dart';
 
@@ -132,7 +131,7 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Booking Status')),
+      appBar: AppBar(title: const Text('Booking Status'), elevation: 0),
       body: SafeArea(
         child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: _bookingRef.snapshots(),
@@ -206,38 +205,161 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
+                      // 🔥 Status Card
                       Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: ListTile(
-                            leading: Icon(icon, color: color),
-                            title: Text(title),
-                            subtitle: Text(subtitle),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(icon, color: color, size: 28),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      title,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        color: color,
+                                      ),
+                                    ),
+                                    Text(
+                                      subtitle,
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
+
+                      const SizedBox(height: 24),
+
+                      // 🔥 Booking Details
+                      Card(
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Booking Details',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _detailRow('Booking ID', widget.bookingId),
+                              _detailRow(
+                                'Bus',
+                                booking['busNumber']?.toString() ?? 'N/A',
+                              ),
+                              _detailRow(
+                                'Route',
+                                booking['routeName']?.toString() ?? 'N/A',
+                              ),
+                              _detailRow(
+                                'Seats',
+                                (booking['seats'] as List?)?.join(', ') ??
+                                    'N/A',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // 🔥 Action Buttons (only show if pending)
                       if (status == 'pending') ...[
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _isCancelling ? null : _confirmBooking,
-                          child: const Text("I'm Ready"),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: _isCancelling ? null : _confirmBooking,
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              "I'm Ready — Confirm Trip",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: _isCancelling
-                              ? null
-                              : () => _cancelAndRelease(booking),
-                          child: _isCancelling
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: _isCancelling
+                                ? null
+                                : () => _cancelAndRelease(booking),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: _isCancelling
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Cancel Booking',
+                                    style: TextStyle(color: Colors.red),
                                   ),
-                                )
-                              : const Text('Cancel Booking'),
+                          ),
                         ),
                       ],
+
+                      // 🔥 Back to Home button (when booking is done)
+                      if (status == 'confirmed' || status == 'cancelled') ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).popUntil((route) => route.isFirst),
+                            child: const Text('Go Home'),
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 16),
                     ],
                   ),
                 );
@@ -245,6 +367,30 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+            ),
+          ),
+        ],
       ),
     );
   }

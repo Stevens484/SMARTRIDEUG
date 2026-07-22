@@ -1,6 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/core/services/authentication_service.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
+import 'package:smartrideug/features/admin/admin_dashboard_page.dart';
+import 'package:smartrideug/features/driver/driver_dashboard_page.dart';
 import 'package:smartrideug/features/home/home_page.dart';
 
 class AuthenticationPage extends StatefulWidget {
@@ -35,6 +39,31 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     super.dispose();
   }
 
+  Future<void> _goToRoleHome() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    String role = 'passenger';
+    if (uid != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      role = doc.data()?['role']?.toString() ?? 'passenger';
+    }
+
+    if (!mounted) return;
+
+    final Widget destination = switch (role) {
+      'admin' => const AdminDashboardPage(),
+      'driver' => const DriverDashboardPage(),
+      _ => const HomePage(),
+    };
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => destination),
+      (_) => false,
+    );
+  }
+
   Future<void> _submit() async {
     if (_email.text.trim().isEmpty || _password.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -62,11 +91,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
           await auth.signInWithEmail(_email.text, _password.text);
         }
       }
-      if (mounted) {
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(HomePage.routeName, (_) => false);
-      }
+      await _goToRoleHome();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

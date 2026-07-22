@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart'; // 🔥 REPLACES google_maps_flutter
+import 'package:latlong2/latlong.dart'; // 🔥 FOR MAP COORDINATES
 import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/home/seat_layout_page.dart';
 
@@ -145,39 +146,102 @@ class BusDetailsPage extends StatelessWidget {
       ],
     );
 
+    // 🔥 NEW: Map preview using FlutterMap (free, no API keys)
     Widget mapPreview(Map<String, dynamic> busData) {
-      final pickup = LatLng(
-        (busData['latitude'] as num?)?.toDouble() ?? 0.3392,
-        (busData['longitude'] as num?)?.toDouble() ?? 32.5736,
-      );
-      final routePoints = [
-        pickup,
-        LatLng(
-          (busData['destinationLat'] as num?)?.toDouble() ?? 0.3516,
-          (busData['destinationLng'] as num?)?.toDouble() ?? 32.6112,
-        ),
-      ];
+      // Get pickup location from bus data, with fallback
+      final pickupLat = (busData['latitude'] as num?)?.toDouble() ?? 0.3392;
+      final pickupLng = (busData['longitude'] as num?)?.toDouble() ?? 32.5736;
+      final destLat = (busData['destinationLat'] as num?)?.toDouble() ?? 0.3516;
+      final destLng =
+          (busData['destinationLng'] as num?)?.toDouble() ?? 32.6112;
 
-      return GoogleMap(
-        initialCameraPosition: CameraPosition(target: pickup, zoom: 13),
-        markers: {
-          Marker(
-            markerId: const MarkerId('pickup'),
-            position: pickup,
-            infoWindow: InfoWindow(
-              title: busData['pickupInfo']?.toString() ?? 'Pickup',
+      final pickup = LatLng(pickupLat, pickupLng);
+      final destination = LatLng(destLat, destLng);
+
+      return Container(
+        height: 240,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: const Color(0xFF0F172A),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: pickup,
+              initialZoom: 14,
+              minZoom: 10,
+              maxZoom: 18,
             ),
+            children: [
+              // 🔥 Dark tile layer (same as live map)
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.mhl.smart_ride_ug',
+              ),
+              // 🔥 Route polyline
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: [pickup, destination],
+                    strokeWidth: 4,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ],
+              ),
+              // 🔥 Markers: pickup (green) and destination (red)
+              MarkerLayer(
+                markers: [
+                  // Pickup marker
+                  Marker(
+                    point: pickup,
+                    width: 32,
+                    height: 32,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  // Destination marker
+                  Marker(
+                    point: destination,
+                    width: 32,
+                    height: 32,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.flag,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              // 🔥 Attribution
+              const RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution('OpenStreetMap contributors'),
+                  TextSourceAttribution('CARTO'),
+                ],
+              ),
+            ],
           ),
-        },
-        polylines: {
-          Polyline(
-            polylineId: const PolylineId('r'),
-            points: routePoints,
-            color: AppTheme.primaryGreen,
-            width: 4,
-          ),
-        },
-        zoomControlsEnabled: false,
+        ),
       );
     }
 
@@ -219,7 +283,7 @@ class BusDetailsPage extends StatelessWidget {
                       children: [
                         detailsColumn(busData),
                         const SizedBox(height: 16),
-                        SizedBox(height: 240, child: mapPreview(busData)),
+                        mapPreview(busData),
                       ],
                     ),
                   );
