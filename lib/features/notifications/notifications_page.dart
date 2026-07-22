@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class NotificationsPage extends StatelessWidget {
@@ -7,32 +9,70 @@ class NotificationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final notifications = [
-      {
-        'title': 'Booking confirmed',
-        'body': 'Your booking for BUS 101 is confirmed.',
-      },
-      {'title': 'Seat available', 'body': 'A seat opened up on BUS 104.'},
-      {'title': 'Promo', 'body': 'Get 10% off on weekend rides.'},
-    ];
+    final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Notifications')),
       body: SafeArea(
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: notifications.length,
-          separatorBuilder: (_, _) => const Divider(),
-          itemBuilder: (context, i) {
-            final n = notifications[i];
-            return ListTile(
-              leading: Icon(
-                Icons.notifications,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: Text(n['title']!),
-              subtitle: Text(n['body']!),
-              onTap: () {},
+        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .where('userId', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Could not load notifications.'));
+            }
+            final docs = snapshot.data?.docs ?? [];
+            if (docs.isEmpty) {
+              return const Center(child: Text('No notifications yet.'));
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: docs.length,
+              separatorBuilder: (_, _) => const Divider(),
+              itemBuilder: (context, i) {
+                final doc = docs[i];
+                final data = doc.data();
+                final read = data['read'] == true;
+                final title = data['title']?.toString() ?? '';
+                final body = data['body']?.toString() ?? '';
+
+                return ListTile(
+                  leading: Icon(
+                    Icons.notifications,
+                    color: read
+                        ? Colors.grey
+                        : Theme.of(context).colorScheme.primary,
+                  ),
+                  title: Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: read ? FontWeight.normal : FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(body),
+                  trailing: read
+                      ? null
+                      : Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                  onTap: () {
+                    if (!read) {
+                      doc.reference.update({'read': true});
+                    }
+                  },
+                );
+              },
             );
           },
         ),
