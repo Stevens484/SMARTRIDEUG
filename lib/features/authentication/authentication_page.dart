@@ -27,6 +27,7 @@ class AuthenticationPage extends StatefulWidget {
 class _AuthenticationPageState extends State<AuthenticationPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _name = TextEditingController();
   late bool _register = widget.operator ? false : widget.register;
   late bool _operator = widget.operator;
   late String _role = widget.role;
@@ -36,6 +37,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _name.dispose();
     super.dispose();
   }
 
@@ -121,85 +123,118 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.darkGreen, AppTheme.primaryGreen],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    backgroundColor: AppTheme.grey50,
+    appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: AppTheme.grey700),
+        onPressed: () => Navigator.pop(context),
       ),
-      child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _operator
-                          ? (_role == 'admin'
-                                ? Icons.admin_panel_settings
-                                : Icons.drive_eta)
-                          : Icons.directions_bus_rounded,
-                      size: 68,
-                      color: AppTheme.primaryGreen,
+    ),
+    body: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: Card(
+            elevation: 8,
+            shadowColor: Colors.black.withValues(alpha: 0.06),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 🔥 LOGO: Replaced Icon with Image.asset
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySoft,
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _headline,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.contain,
                     ),
-                    const SizedBox(height: 6),
-                    Text(_subtitle, textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email address',
-                        prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _headline,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _subtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppTheme.grey500),
+                  ),
+                  const SizedBox(height: 28),
+
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email address',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: _password,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _busy ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _password,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _busy ? null : _submit,
-                        child: Text(
-                          _busy
-                              ? 'Please wait...'
-                              : _register
-                              ? 'Register'
-                              : 'Login',
+                      child: Text(
+                        _busy
+                            ? 'Please wait...'
+                            : _register
+                            ? 'Create Account'
+                            : 'Sign In',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    if (!_operator)
-                      TextButton(
-                        onPressed: _busy
-                            ? null
-                            : () => setState(() => _register = !_register),
-                        child: Text(
-                          _register
-                              ? 'Already have an account? Login'
-                              : 'New to SmartRide UG? Register',
+                  ),
+
+                  if (!_operator) ...[
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () => setState(() => _register = !_register),
+                      child: Text(
+                        _register
+                            ? 'Already have an account? Sign in'
+                            : 'New to SmartRide UG? Create account',
+                        style: TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
