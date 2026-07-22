@@ -23,16 +23,15 @@ class AuthenticationPage extends StatefulWidget {
 class _AuthenticationPageState extends State<AuthenticationPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _employeeId = TextEditingController();
-  late bool _register = widget.register;
+  late bool _register = widget.operator ? false : widget.register;
   late bool _operator = widget.operator;
   late String _role = widget.role;
   bool _busy = false;
+
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
-    _employeeId.dispose();
     super.dispose();
   }
 
@@ -47,37 +46,18 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
       );
       return;
     }
-    if (_operator && _employeeId.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a verified employee ID to continue.'),
-        ),
-      );
-      return;
-    }
 
     setState(() => _busy = true);
     try {
       final auth = AuthenticationService();
       if (_register) {
-        if (_operator) {
-          await auth.registerWithEmail(
-            email: _email.text,
-            password: _password.text,
-          );
-        } else {
-          await auth.registerWithEmail(
-            email: _email.text,
-            password: _password.text,
-          );
-        }
+        await auth.registerWithEmail(
+          email: _email.text,
+          password: _password.text,
+        );
       } else {
         if (_operator) {
-          await auth.signInWithEmail(
-            _email.text,
-            _password.text,
-            role: _role,
-          );
+          await auth.signInWithEmail(_email.text, _password.text, role: _role);
         } else {
           await auth.signInWithEmail(_email.text, _password.text);
         }
@@ -96,6 +76,22 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String get _headline {
+    if (_operator) {
+      return _role == 'admin' ? 'Admin sign in' : 'Driver sign in';
+    }
+    return _register ? 'Create your account' : 'Welcome back';
+  }
+
+  String get _subtitle {
+    if (_operator) {
+      return 'Staff accounts are created by an administrator.';
+    }
+    return _register
+        ? 'Start riding SmartRide UG.'
+        : 'Sign in to continue your journey.';
   }
 
   @override
@@ -118,22 +114,22 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.directions_bus_rounded,
+                    Icon(
+                      _operator
+                          ? (_role == 'admin'
+                                ? Icons.admin_panel_settings
+                                : Icons.drive_eta)
+                          : Icons.directions_bus_rounded,
                       size: 68,
                       color: AppTheme.primaryGreen,
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      _register ? 'Create your account' : 'Welcome back',
+                      _headline,
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      _register
-                          ? 'Start riding SmartRide UG.'
-                          : 'Sign in to continue your journey.',
-                    ),
+                    Text(_subtitle, textAlign: TextAlign.center),
                     const SizedBox(height: 24),
                     TextField(
                       controller: _email,
@@ -152,27 +148,6 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),
-                    if (_operator) ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _employeeId,
-                        decoration: const InputDecoration(
-                          labelText: 'Employee ID',
-                          prefixIcon: Icon(Icons.badge_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Operator role',
-                          prefixIcon: Icon(Icons.work_outline),
-                        ),
-                        child: Text(
-                          _role == 'admin' ? 'Admin' : 'Driver',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
@@ -187,16 +162,17 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                         ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: _busy
-                          ? null
-                          : () => setState(() => _register = !_register),
-                      child: Text(
-                        _register
-                            ? 'Already have an account? Login'
-                            : 'New to SmartRide UG? Register',
+                    if (!_operator)
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => setState(() => _register = !_register),
+                        child: Text(
+                          _register
+                              ? 'Already have an account? Login'
+                              : 'New to SmartRide UG? Register',
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
