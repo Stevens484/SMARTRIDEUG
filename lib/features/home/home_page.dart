@@ -12,7 +12,8 @@ import 'package:smartrideug/features/home/saved_places_page.dart';
 import 'package:smartrideug/features/home/seat_reservations_page.dart';
 import 'package:smartrideug/features/home/settings_page.dart';
 import 'package:smartrideug/features/notifications/notifications_page.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// 🔥 REMOVED: google_maps_flutter import (we're using FlutterMap now)
+// import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -105,7 +106,9 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SeatReservationsPage()),
+                  MaterialPageRoute(
+                    builder: (_) => const SeatReservationsPage(),
+                  ),
                 );
               },
             ),
@@ -213,27 +216,7 @@ class _HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<_HomeContent> {
-  final bool _hasActiveRide = false;
-
-  Set<Marker> _markersFrom(QuerySnapshot<Map<String, dynamic>> snapshot) =>
-      snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            final lat = (data['latitude'] as num?)?.toDouble();
-            final lng = (data['longitude'] as num?)?.toDouble();
-            if (lat == null || lng == null) return null;
-            final seats = data['availableSeats']?.toString() ?? 'Unknown';
-            return Marker(
-              markerId: MarkerId(doc.id),
-              position: LatLng(lat, lng),
-              infoWindow: InfoWindow(
-                title: data['busNumber']?.toString() ?? doc.id,
-                snippet: '$seats seats available',
-              ),
-            );
-          })
-          .whereType<Marker>()
-          .toSet();
+  // 🔥 REMOVED: unused _hasActiveRide field
 
   @override
   Widget build(BuildContext context) {
@@ -443,23 +426,29 @@ class _HomeContentState extends State<_HomeContent> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
+                  // 🔥 "View on Map" Button — NOW NAVIGATES TO LIVE MAP!
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pushNamed('/live-map');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'View on Map',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'View on Map',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -790,51 +779,40 @@ class _HomeContentState extends State<_HomeContent> {
                       ),
                     ),
                     TextButton(
+                      // 🔥 "View Full Map" Button — NOW NAVIGATES TO LIVE MAP!
                       onPressed: () {
-                        // Open full map page
+                        Navigator.of(context).pushNamed('/live-map');
                       },
                       child: const Text('View Full Map'),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 ClipRRect(
                   borderRadius: BorderRadius.circular(18),
                   child: SizedBox(
                     height: 260,
-                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('busLocations')
-                          .where(
-                            'status',
-                            whereIn: [
-                              'online',
-                              'moving',
-                              'approaching_stop',
-                              'stopped',
-                            ],
-                          )
-                          .snapshots(),
-                      builder: (context, snapshot) => GoogleMap(
-                        initialCameraPosition: const CameraPosition(
-                          target: LatLng(0.3476, 32.5825),
-                          zoom: 13,
+                    child: Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      child: const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.map, size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text(
+                              'Tap "View Full Map" to see live buses',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
                         ),
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        zoomControlsEnabled: false,
-                        markers: snapshot.hasData
-                            ? _markersFrom(snapshot.data!)
-                            : const {},
                       ),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 Row(
                   children: const [
                     Icon(Icons.directions_bus, color: Colors.green, size: 18),
@@ -1221,187 +1199,7 @@ class _ToolCard extends StatelessWidget {
   }
 }
 
-class _HomeActiveRideCard extends StatelessWidget {
-  final VoidCallback onNavigateToTracking;
-  final VoidCallback onEndTrip;
-  final String busNumber;
-  final String destination;
-  final String arrivalTime;
-
-  const _HomeActiveRideCard({
-    required this.onNavigateToTracking,
-    required this.onEndTrip,
-    required this.busNumber,
-    required this.destination,
-    required this.arrivalTime,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Theme.of(context).colorScheme.primary.withAlpha(26),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      busNumber,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'ON THE WAY',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        destination,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'ETA',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      arrivalTime,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.navigation),
-                label: const Text('Track Your Ride'),
-                onPressed: onNavigateToTracking,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.close),
-                label: const Text('End Trip'),
-                onPressed: () {
-                  onEndTrip();
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Trip ended')));
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String status;
-  final IconData icon;
-
-  const _StatusCard({
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
-              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(status),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// 🔥 REMOVED: _HomeActiveRideCard (unused)
 
 class _BookingsTab extends StatelessWidget {
   const _BookingsTab();
@@ -1434,9 +1232,9 @@ class _BookingsTab extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         ElevatedButton(
-          onPressed: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const SeatReservationsPage())),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SeatReservationsPage()),
+          ),
           child: const Text('Open booking details'),
         ),
       ],
@@ -1630,26 +1428,58 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 }
 
-class _RouteSummaryTile extends StatelessWidget {
+// 🔥 REMOVED: _RouteSummaryTile (unused)
+
+class _StatusCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String status;
+  final IconData icon;
 
-  const _RouteSummaryTile({required this.title, required this.subtitle});
+  const _StatusCard({
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(
-          Icons.route,
-          color: Theme.of(context).colorScheme.primary,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(status),
+                ],
+              ),
+            ),
+          ],
         ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {},
       ),
     );
   }
