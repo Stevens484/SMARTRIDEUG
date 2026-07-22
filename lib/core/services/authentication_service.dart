@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class AuthenticationService {
   AuthenticationService({FirebaseAuth? auth, FirebaseFirestore? firestore})
@@ -19,7 +20,6 @@ class AuthenticationService {
     String email,
     String password, {
     String? role,
-    String? employeeId,
   }) async {
     final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
@@ -32,13 +32,9 @@ class AuthenticationService {
           .doc(credential.user!.uid)
           .get();
       final data = userDoc.data();
-      if (data == null ||
-          data['role'] != role ||
-          data['employeeId'] != employeeId?.trim()) {
+      if (data == null || data['role'] != role) {
         await _auth.signOut();
-        throw StateError(
-          'Operator sign-in failed. Please check your role and employee ID.',
-        );
+        throw StateError('Operator sign-in failed. Please check your role.');
       }
     }
 
@@ -48,25 +44,7 @@ class AuthenticationService {
   Future<UserCredential> registerWithEmail({
     required String email,
     required String password,
-    required String role,
-    required String employeeId,
   }) async {
-    if (role != 'passenger') {
-      final matching = await _db
-          .collection('operatorIds')
-          .where('role', isEqualTo: role)
-          .where('employeeId', isEqualTo: employeeId.trim())
-          .where('approved', isEqualTo: true)
-          .limit(1)
-          .get();
-
-      if (matching.docs.isEmpty) {
-        throw StateError(
-          'Employee ID verification failed. Please use a valid approved ID.',
-        );
-      }
-    }
-
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -74,12 +52,42 @@ class AuthenticationService {
 
     await _db.collection('users').doc(credential.user!.uid).set({
       'email': email.trim(),
-      'role': role,
-      'employeeId': role == 'passenger' ? '' : employeeId.trim(),
+      'role': 'passenger',
+      'employeeId': '',
       'createdAt': FieldValue.serverTimestamp(),
     });
 
     return credential;
+  }
+
+  Future<void> createStaffAccount({
+    required String name,
+    required String email,
+    required String password,
+    required String employeeId,
+    required String role,
+  }) async {
+    final secondaryApp = await Firebase.initializeApp(
+      name: 'staffCreation-${DateTime.now().millisecondsSinceEpoch}',
+      options: Firebase.app().options,
+    );
+    try {
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      await _db.collection('users').doc(credential.user!.uid).set({
+        'name': name.trim(),
+        'email': email.trim(),
+        'role': role,
+        'employeeId': employeeId.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await secondaryAuth.signOut();
+    } finally {
+      await secondaryApp.delete();
+    }
   }
 
   Future<void> updateProfile({String? name, String? photoUrl}) =>
