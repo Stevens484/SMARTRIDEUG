@@ -12,6 +12,7 @@ import 'package:smartrideug/features/home/saved_places_page.dart';
 import 'package:smartrideug/features/home/seat_reservations_page.dart';
 import 'package:smartrideug/features/home/settings_page.dart';
 import 'package:smartrideug/features/notifications/notifications_page.dart';
+import 'package:smartrideug/core/theme/app_theme.dart';
 
 class HomePage extends StatefulWidget {
   final bool guestMode;
@@ -351,7 +352,7 @@ class _GuestRestrictedTab extends StatelessWidget {
 }
 
 // ============================================================
-// 🔥 HOME CONTENT — FIXED OVERFLOW ISSUES
+// 🔥 HOME CONTENT — FIXED
 // ============================================================
 class _HomeContent extends StatefulWidget {
   final bool guestMode;
@@ -389,7 +390,6 @@ class _HomeContentState extends State<_HomeContent> {
         ),
       ),
       child: SingleChildScrollView(
-        // 🔥 FIX: Wrapped in SingleChildScrollView
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,7 +457,7 @@ class _HomeContentState extends State<_HomeContent> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // 🔥 FIX: Search Bar with proper width
+                  // Search Bar
                   Row(
                     children: [
                       Expanded(
@@ -583,7 +583,6 @@ class _HomeContentState extends State<_HomeContent> {
                         ],
                       ),
                     ),
-                    // 🔥 FIX: Smaller "View on Map" button to prevent overflow
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -857,7 +856,7 @@ class _HomeContentState extends State<_HomeContent> {
               ),
             ),
             const SizedBox(height: 8),
-            // Live Map Section
+            // 🔥 FIX 1: Live Map Section with VISIBLE View Full Map button
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -872,20 +871,43 @@ class _HomeContentState extends State<_HomeContent> {
                         color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushNamed('/live-map');
-                      },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                    // 🔥 NEW: White Gradient Button — VISIBLE!
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Colors.white, Color(0xFFF5F5F5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        minimumSize: Size.zero,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'View Full Map',
-                        style: TextStyle(fontSize: 12),
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamed('/live-map');
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          minimumSize: Size.zero,
+                        ),
+                        child: const Text(
+                          'View Full Map',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppTheme.primary,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -929,7 +951,7 @@ class _HomeContentState extends State<_HomeContent> {
               ],
             ),
             const SizedBox(height: 16),
-            // Upcoming Trips
+            // 🔥 FIX 2: Upcoming Trips — NO OVERFLOW
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -955,6 +977,7 @@ class _HomeContentState extends State<_HomeContent> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                // 🔥 FIX: Smaller, tighter trip card
                 Container(
                   decoration: BoxDecoration(
                     color: Theme.of(
@@ -967,12 +990,12 @@ class _HomeContentState extends State<_HomeContent> {
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   child: Row(
                     children: [
                       Container(
-                        width: 56,
-                        height: 56,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           color: Theme.of(
                             context,
@@ -981,12 +1004,12 @@ class _HomeContentState extends State<_HomeContent> {
                         ),
                         child: Image.asset(
                           'assets/images/logo.png',
-                          width: 32,
-                          height: 32,
+                          width: 28,
+                          height: 28,
                           fit: BoxFit.contain,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -997,37 +1020,37 @@ class _HomeContentState extends State<_HomeContent> {
                                   'Kampala',
                                   style: TextStyle(
                                     color: colorScheme.onPrimary,
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 4),
                                 Icon(
                                   Icons.arrow_forward,
                                   color: colorScheme.primary,
-                                  size: 14,
+                                  size: 11,
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 4),
                                 Text(
                                   'Mbarara',
                                   style: TextStyle(
                                     color: colorScheme.onPrimary,
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Row(
                               children: [
                                 Icon(
                                   Icons.calendar_today,
                                   color: Theme.of(context).colorScheme.onPrimary
                                       .withValues(alpha: 0.8),
-                                  size: 12,
+                                  size: 10,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3),
                                 Text(
                                   '17 May 2025',
                                   style: TextStyle(
@@ -1035,17 +1058,17 @@ class _HomeContentState extends State<_HomeContent> {
                                         .colorScheme
                                         .onPrimary
                                         .withValues(alpha: 0.8),
-                                    fontSize: 11,
+                                    fontSize: 9,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 6),
                                 Icon(
                                   Icons.schedule,
                                   color: Theme.of(context).colorScheme.onPrimary
                                       .withValues(alpha: 0.8),
-                                  size: 12,
+                                  size: 10,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3),
                                 Text(
                                   '10:30 AM',
                                   style: TextStyle(
@@ -1053,30 +1076,30 @@ class _HomeContentState extends State<_HomeContent> {
                                         .colorScheme
                                         .onPrimary
                                         .withValues(alpha: 0.8),
-                                    fontSize: 11,
+                                    fontSize: 9,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Row(
                               children: [
                                 Text(
                                   'Seat A12',
                                   style: TextStyle(
                                     color: colorScheme.onPrimary,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 6),
                                 Text(
                                   'UGX 25,000',
                                   style: TextStyle(
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.primary,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -1087,8 +1110,8 @@ class _HomeContentState extends State<_HomeContent> {
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 5,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
@@ -1098,7 +1121,7 @@ class _HomeContentState extends State<_HomeContent> {
                           'Confirmed',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onPrimary,
-                            fontSize: 9,
+                            fontSize: 7,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1185,7 +1208,7 @@ class _HomeContentState extends State<_HomeContent> {
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
                   Expanded(
@@ -1196,7 +1219,7 @@ class _HomeContentState extends State<_HomeContent> {
                           'Travel Smart with',
                           style: TextStyle(
                             color: colorScheme.onPrimary,
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1205,7 +1228,7 @@ class _HomeContentState extends State<_HomeContent> {
                           'SmartRide UG',
                           style: TextStyle(
                             color: colorScheme.onPrimary,
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1218,15 +1241,15 @@ class _HomeContentState extends State<_HomeContent> {
                             color: Theme.of(
                               context,
                             ).colorScheme.onPrimary.withValues(alpha: 0.85),
-                            fontSize: 11,
+                            fontSize: 10,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: Theme.of(
                         context,
@@ -1235,8 +1258,8 @@ class _HomeContentState extends State<_HomeContent> {
                     ),
                     child: Image.asset(
                       'assets/images/logo.png',
-                      width: 36,
-                      height: 36,
+                      width: 32,
+                      height: 32,
                       fit: BoxFit.contain,
                     ),
                   ),
