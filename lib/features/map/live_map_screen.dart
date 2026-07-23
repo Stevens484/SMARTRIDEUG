@@ -17,8 +17,8 @@ class LiveMapScreen extends StatefulWidget {
 class _LiveMapScreenState extends State<LiveMapScreen> {
   final MapController _mapController = MapController();
   final BusSimulationService _simulationService = BusSimulationService();
-  LatLng _currentPosition = const LatLng(0.3136, 32.5811);
   bool _isFollowingBus = true;
+  BusModel? _selectedBus;
 
   static const List<LatLng> _routePoints = [
     LatLng(0.3136, 32.5811),
@@ -70,8 +70,18 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     super.dispose();
   }
 
+  void _selectBus(BusModel bus) {
+    setState(() {
+      _selectedBus = bus;
+      _isFollowingBus = true;
+      _mapController.move(bus.position, 16);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
       backgroundColor: AppTheme.grey50,
       appBar: AppBar(
@@ -85,31 +95,31 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
           IconButton(
             icon: const Icon(Icons.my_location, color: AppTheme.primary),
             onPressed: () {
-              setState(() => _isFollowingBus = true);
-              _mapController.move(_currentPosition, 16);
+              if (_selectedBus != null) {
+                _mapController.move(_selectedBus!.position, 16);
+              }
             },
           ),
         ],
       ),
-      body: StreamBuilder<BusModel>(
-        // 🔥 USE SIMULATION — NOT FIRESTORE
-        stream: _simulationService.simulateBusMovement(
-          'BUS-001',
-          'Route 4A - Kampala Loop',
-        ),
+      body: StreamBuilder<List<BusModel>>(
+        stream: _simulationService.simulateMultipleBuses(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(
               child: CircularProgressIndicator(color: AppTheme.primary),
             );
           }
 
-          final bus = snapshot.data!;
-          _currentPosition = bus.position;
+          final buses = snapshot.data!;
 
-          if (_isFollowingBus) {
+          if (_selectedBus == null && buses.isNotEmpty) {
+            _selectedBus = buses.first;
+          }
+
+          if (_isFollowingBus && _selectedBus != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _mapController.move(bus.position, 16);
+              _mapController.move(_selectedBus!.position, 16);
             });
           }
 
@@ -118,8 +128,10 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: bus.position,
-                  initialZoom: 16,
+                  initialCenter: buses.isNotEmpty
+                      ? buses.first.position
+                      : const LatLng(0.3136, 32.5811),
+                  initialZoom: 15,
                   minZoom: 12,
                   maxZoom: 18,
                   onTap: (_, __) => setState(() => _isFollowingBus = false),
@@ -140,15 +152,18 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                       ),
                     ],
                   ),
+                  // 🔥 BUS MARKERS WITH FLOATING INFO — FIXED OVERFLOW
                   MarkerLayer(
-                    markers: [
-                      // Bus
-                      Marker(
+                    markers: buses.map((bus) {
+                      final isSelected = _selectedBus?.id == bus.id;
+                      final color = bus.seatColor;
+                      return Marker(
                         point: bus.position,
-                        width: 50,
-                        height: 50,
+                        width: 80,
+                        height: 70,
                         child: GestureDetector(
                           onTap: () {
+                            _selectBus(bus);
                             showModalBottomSheet(
                               context: context,
                               backgroundColor: Colors.transparent,
@@ -156,42 +171,105 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                               builder: (context) => BusPopupWidget(bus: bus),
                             );
                           },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withValues(alpha: 0.3),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              margin: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.primary.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    blurRadius: 12,
-                                    spreadRadius: 2,
+                          child: Column(
+                            children: [
+                              // 🔥 FLOATING INFO BUBBLE — CONTAINED WITH MAX WIDTH
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      screenWidth * 0.45, // 🔥 Prevent overflow
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
                                   ),
-                                ],
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.8),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: color,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: color,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Flexible(
+                                        child: Text(
+                                          bus.id,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Flexible(
+                                        child: Text(
+                                          '${bus.availableSeats} seats',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 7,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.directions_bus,
-                                color: Colors.white,
-                                size: 20,
+                              const SizedBox(height: 2),
+                              Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.primary : color,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 3,
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.5),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.directions_bus,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
-                      ),
-                      // Start
+                      );
+                    }).toList(),
+                  ),
+                  // Start & End markers
+                  MarkerLayer(
+                    markers: [
                       Marker(
                         point: _routePoints.first,
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.green,
@@ -200,23 +278,22 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.green.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                spreadRadius: 4,
+                                blurRadius: 10,
+                                spreadRadius: 3,
                               ),
                             ],
                           ),
                           child: const Icon(
                             Icons.circle,
                             color: Colors.white,
-                            size: 16,
+                            size: 12,
                           ),
                         ),
                       ),
-                      // End
                       Marker(
                         point: _routePoints.last,
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.red,
@@ -225,15 +302,15 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.red.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                spreadRadius: 4,
+                                blurRadius: 10,
+                                spreadRadius: 3,
                               ),
                             ],
                           ),
                           child: const Icon(
                             Icons.flag,
                             color: Colors.white,
-                            size: 16,
+                            size: 12,
                           ),
                         ),
                       ),
@@ -244,8 +321,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                     markers: _stops.map((stop) {
                       return Marker(
                         point: stop.position,
-                        width: 40,
-                        height: 40,
+                        width: 32,
+                        height: 32,
                         child: GestureDetector(
                           onTap: () {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -268,7 +345,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 8,
+                                  blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
@@ -276,7 +353,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                             child: const Icon(
                               Icons.circle,
                               color: AppTheme.grey500,
-                              size: 16,
+                              size: 12,
                             ),
                           ),
                         ),
@@ -291,67 +368,110 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   ),
                 ],
               ),
-              // Bottom Info Bar
+              // 🔥 BOTTOM TAPABLE BAR — FIXED OVERFLOW
               Positioned(
-                bottom: 24,
-                left: 16,
-                right: 16,
+                bottom: 16,
+                left: 8,
+                right: 8,
                 child: Container(
-                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 6,
+                    horizontal: 8,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '🚌 ${bus.id}',
-                              style: TextStyle(
-                                color: AppTheme.grey900,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${bus.speed.toStringAsFixed(0)} km/h • ${bus.passengerCount}/${bus.totalSeats} passengers',
-                              style: TextStyle(
-                                color: AppTheme.grey500,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
+                      // Color legend
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildColorDot(Colors.green, 'Available'),
+                          const SizedBox(width: 10),
+                          _buildColorDot(Colors.orange, 'Limited'),
+                          const SizedBox(width: 10),
+                          _buildColorDot(Colors.red, 'Full'),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primarySoft,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${bus.availableSeats} seats left',
-                          style: TextStyle(
-                            color: AppTheme.primaryDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                      const Divider(height: 6, thickness: 0.5),
+                      // Bus list
+                      ...buses.map((bus) {
+                        final isSelected = _selectedBus?.id == bus.id;
+                        return GestureDetector(
+                          onTap: () => _selectBus(bus),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 4,
+                              horizontal: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppTheme.primarySoft
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: bus.seatColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  bus.id,
+                                  style: TextStyle(
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    fontSize: 11,
+                                    color: AppTheme.grey900,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    bus.routeName,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: AppTheme.grey500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${bus.availableSeats} seats',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: bus.seatColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  Icons.chevron_right,
+                                  size: 14,
+                                  color: AppTheme.grey500,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      }).toList(),
                     ],
                   ),
                 ),
@@ -360,6 +480,20 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildColorDot(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 3),
+        Text(label, style: TextStyle(fontSize: 9, color: AppTheme.grey500)),
+      ],
     );
   }
 }

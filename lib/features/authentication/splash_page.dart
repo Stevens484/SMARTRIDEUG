@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/core/services/authentication_service.dart';
+import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/authentication/authentication_page.dart';
 import 'package:smartrideug/features/home/home_page.dart';
 
@@ -16,6 +16,23 @@ class SplashPage extends StatelessWidget {
           child: Image.asset(
             'assets/images/landing_bg.png',
             fit: BoxFit.cover,
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: const [
+                Color(0xFF1A1A3A),
+                Color(0xFF0A0E1A),
+                Color(0xFF0F172A),
+                Color(0xFF1E293B),
+                Color(0xFF10B981),
+              ],
+              stops: const [0.0, 0.25, 0.50, 0.75, 1.0],
+            ),
           ),
         ),
         Container(
@@ -41,17 +58,16 @@ class SplashPage extends StatelessWidget {
                   children: [
                 const SizedBox(height: 20),
 
-                // 🔥 LOGO
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        blurRadius: 40,
-                        spreadRadius: 10,
+                        color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                        blurRadius: 60,
+                        spreadRadius: 15,
                       ),
                     ],
                   ),
@@ -72,6 +88,13 @@ class SplashPage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     fontSize: 36,
                     letterSpacing: 1.2,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -82,12 +105,18 @@ class SplashPage extends StatelessWidget {
                     color: Colors.white70,
                     fontSize: 18,
                     letterSpacing: 0.5,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                 ),
 
                 const SizedBox(height: 40),
 
-                // GUEST
                 _sectionLabel('GUEST'),
                 const SizedBox(height: 8),
                 OutlinedButton(
@@ -134,7 +163,6 @@ class SplashPage extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // PASSENGER
                 _sectionLabel('PASSENGER'),
                 const SizedBox(height: 8),
                 ElevatedButton(
@@ -146,9 +174,9 @@ class SplashPage extends StatelessWidget {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: AppTheme.primary,
+                    foregroundColor: const Color(0xFF10B981),
                     elevation: 6,
-                    shadowColor: Colors.white.withValues(alpha: 0.3),
+                    shadowColor: Colors.white.withValues(alpha: 0.2),
                   ),
                   child: const Text(
                     'Passenger Login',
@@ -172,7 +200,6 @@ class SplashPage extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // DRIVER
                 _sectionLabel('DRIVER'),
                 const SizedBox(height: 8),
                 OutlinedButton(
@@ -195,7 +222,6 @@ class SplashPage extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // ADMIN
                 _sectionLabel('ADMIN'),
                 const SizedBox(height: 8),
                 OutlinedButton(

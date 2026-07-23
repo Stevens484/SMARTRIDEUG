@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smartrideug/core/models/bus_model.dart';
+import 'package:smartrideug/core/theme/app_theme.dart';
 
 class BusPopupWidget extends StatelessWidget {
   final BusModel bus;
@@ -8,14 +9,16 @@ class BusPopupWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = bus.seatColor;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -25,50 +28,67 @@ class BusPopupWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 60,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[700],
+                color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: 20),
 
-          // Bus Info
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons.directions_bus,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: Icon(Icons.directions_bus, color: color, size: 32),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      bus.id,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          bus.id,
+                          style: const TextStyle(
+                            color: AppTheme.grey900,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            bus.seatStatus,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       bus.routeName,
-                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                      style: TextStyle(color: AppTheme.grey500, fontSize: 14),
                     ),
                   ],
                 ),
@@ -78,7 +98,6 @@ class BusPopupWidget extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Stats Grid
           Row(
             children: [
               _buildStatItem('Speed', '${bus.speed.toStringAsFixed(0)} km/h'),
@@ -89,21 +108,20 @@ class BusPopupWidget extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // ETA
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.grey50,
+              borderRadius: BorderRadius.circular(10),
             ),
             child: const Row(
               children: [
-                Icon(Icons.timer, color: Color(0xFF38BDF8)),
+                Icon(Icons.timer, color: AppTheme.primary, size: 20),
                 SizedBox(width: 8),
                 Text(
                   'Estimated arrival: ~5 min',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: AppTheme.grey700),
                 ),
               ],
             ),
@@ -111,12 +129,12 @@ class BusPopupWidget extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          // Book Seat Button
+          // 🔥 FIXED: Book Seat button uses Navigator.push with proper route
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: AppTheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -124,7 +142,7 @@ class BusPopupWidget extends StatelessWidget {
               ),
               onPressed: () {
                 Navigator.pop(context);
-                // 🔥 Navigate to Confirm Seat Page with bus data
+                // 🔥 FIX: Use direct Navigation with MaterialPageRoute
                 Navigator.pushNamed(
                   context,
                   '/confirm-seat',
@@ -142,7 +160,11 @@ class BusPopupWidget extends StatelessWidget {
                   SizedBox(width: 8),
                   Text(
                     'Book Seat',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -160,12 +182,15 @@ class BusPopupWidget extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppTheme.grey900,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(color: AppTheme.grey500, fontSize: 12),
+          ),
         ],
       ),
     );

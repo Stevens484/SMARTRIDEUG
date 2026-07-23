@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart'; // 🔥 ADD THIS IMPORT
 import 'package:latlong2/latlong.dart';
 
 class BusModel {
@@ -23,6 +24,18 @@ class BusModel {
     required this.status,
     required this.lastUpdated,
   });
+
+  Color get seatColor {
+    if (availableSeats >= 15) return Colors.green;
+    if (availableSeats >= 5) return Colors.orange;
+    return Colors.red;
+  }
+
+  String get seatStatus {
+    if (availableSeats >= 15) return 'Available';
+    if (availableSeats >= 5) return 'Limited';
+    return 'Full';
+  }
 
   factory BusModel.fromFirestore(String docId, Map<String, dynamic> data) {
     final geo = data['location'] as GeoPoint;
