@@ -16,6 +16,10 @@ class _DestinationPageState extends State<DestinationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(
+      context,
+    ).padding.bottom; // 🔥 Get system bottom padding
+
     return Scaffold(
       appBar: AppBar(title: const Text('Choose Destination'), elevation: 0),
       body: SafeArea(
@@ -23,7 +27,7 @@ class _DestinationPageState extends State<DestinationPage> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              // 🔥 Search Bar
+              // Search Bar
               TextField(
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search),
@@ -41,7 +45,7 @@ class _DestinationPageState extends State<DestinationPage> {
               ),
               const SizedBox(height: 16),
 
-              // 🔥 Routes List
+              // 🔥 Routes List (Expanded = takes all remaining space)
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
@@ -66,10 +70,7 @@ class _DestinationPageState extends State<DestinationPage> {
                             const SizedBox(height: 12),
                             Text(
                               'Failed to load routes',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 16,
-                              ),
+                              style: TextStyle(color: Colors.grey[600]),
                             ),
                             const SizedBox(height: 12),
                             ElevatedButton(
@@ -83,7 +84,6 @@ class _DestinationPageState extends State<DestinationPage> {
 
                     final routes = snapshot.data!.docs;
 
-                    // 🔥 Filter routes based on search query
                     final filteredRoutes = _searchQuery.isEmpty
                         ? routes
                         : routes.where((route) {
@@ -179,32 +179,35 @@ class _DestinationPageState extends State<DestinationPage> {
 
               const SizedBox(height: 12),
 
-              // 🔥 Info Card
-              Card(
-                elevation: 0,
-                color: Theme.of(
-                  context,
-                ).colorScheme.primaryContainer.withValues(alpha: 0.1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Live updates: Bus locations and seat availability are updated in real time.',
-                          style: TextStyle(fontSize: 13),
+              // 🔥 FIX: Added bottom padding to prevent overflow
+              Padding(
+                padding: EdgeInsets.only(bottom: bottomPadding + 8),
+                child: Card(
+                  elevation: 0,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Live updates: Bus locations and seat availability are updated in real time.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -216,9 +219,6 @@ class _DestinationPageState extends State<DestinationPage> {
   }
 }
 
-// ============================================================
-// 🔥 ROUTE CARD
-// ============================================================
 class _RouteCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -252,7 +252,6 @@ class _RouteCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔥 Route Icon/Number
               Container(
                 width: 48,
                 height: 48,
@@ -271,8 +270,6 @@ class _RouteCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-
-              // 🔥 Route Details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,8 +317,6 @@ class _RouteCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // 🔥 Bus Count & Arrow
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [

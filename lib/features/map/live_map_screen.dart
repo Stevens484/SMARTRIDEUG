@@ -1,11 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:smartrideug/core/models/bus_model.dart';
 import 'package:smartrideug/core/models/stop_model.dart';
-import 'package:smartrideug/core/services/bus_simulation_service.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
-import 'package:smartrideug/features/map/bus_popup_widget.dart';
 
 class LiveMapScreen extends StatefulWidget {
   const LiveMapScreen({super.key});
@@ -16,484 +14,272 @@ class LiveMapScreen extends StatefulWidget {
 
 class _LiveMapScreenState extends State<LiveMapScreen> {
   final MapController _mapController = MapController();
-  final BusSimulationService _simulationService = BusSimulationService();
-  bool _isFollowingBus = true;
-  BusModel? _selectedBus;
+  final LatLng _defaultCenter = const LatLng(0.3320, 32.5705); // Makerere-ish
 
-  static const List<LatLng> _routePoints = [
-    LatLng(0.3136, 32.5811),
-    LatLng(0.3180, 32.5780),
-    LatLng(0.3220, 32.5760),
-    LatLng(0.3292, 32.5711),
-    LatLng(0.3340, 32.5675),
-    LatLng(0.3300, 32.5650),
-    LatLng(0.3260, 32.5680),
+  // busId -> latest known data from busLocations
+  final Map<String, Map<String, dynamic>> _buses = {};
+  // busId -> accumulated trail of real positions seen this session
+  final Map<String, List<LatLng>> _trails = {};
+
+  bool _hasCentered = false;
+
+  static const List<Color> _palette = [
+    AppTheme.primary,
+    Colors.deepOrange,
+    Colors.purple,
+    Colors.teal,
+    Colors.indigo,
   ];
 
   static final List<StopModel> _stops = [
     StopModel(
       id: 'stop_1',
       name: 'Old Taxi Park',
-      position: LatLng(0.3136, 32.5811),
+      position: const LatLng(0.3136, 32.5811),
     ),
     StopModel(
       id: 'stop_2',
       name: 'City Square',
-      position: LatLng(0.3180, 32.5780),
+      position: const LatLng(0.3180, 32.5780),
     ),
     StopModel(
       id: 'stop_3',
       name: 'Wandegeya',
-      position: LatLng(0.3220, 32.5760),
+      position: const LatLng(0.3220, 32.5760),
     ),
     StopModel(
       id: 'stop_4',
       name: 'Makerere Main Gate',
-      position: LatLng(0.3292, 32.5711),
-    ),
-    StopModel(id: 'stop_5', name: 'CoCIS', position: LatLng(0.3340, 32.5675)),
-    StopModel(
-      id: 'stop_6',
-      name: 'Mulago Hospital',
-      position: LatLng(0.3300, 32.5650),
+      position: const LatLng(0.3292, 32.5711),
     ),
     StopModel(
-      id: 'stop_7',
-      name: 'Nakasero',
-      position: LatLng(0.3260, 32.5680),
+      id: 'stop_5',
+      name: 'CoCIS',
+      position: const LatLng(0.3340, 32.5675),
     ),
   ];
 
-  @override
-  void dispose() {
-    _simulationService.dispose();
-    super.dispose();
-  }
-
-  void _selectBus(BusModel bus) {
-    setState(() {
-      _selectedBus = bus;
-      _isFollowingBus = true;
-      _mapController.move(bus.position, 16);
-    });
-  }
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _busStream;
 
   @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+  void initState() {
+    super.initState();
+    _busStream = FirebaseFirestore.instance
+        .collection('busLocations')
+        .where('status', whereIn: ['online', 'moving', 'approaching_stop'])
+        .snapshots();
+  }
 
-    return Scaffold(
-      backgroundColor: AppTheme.grey50,
-      appBar: AppBar(
-        title: const Text(
-          'Live Bus Tracking',
-          style: TextStyle(color: AppTheme.grey900),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.my_location, color: AppTheme.primary),
-            onPressed: () {
-              if (_selectedBus != null) {
-                _mapController.move(_selectedBus!.position, 16);
-              }
-            },
-          ),
-        ],
+  Color _colorFor(String busId) =>
+      _palette[busId.hashCode.abs() % _palette.length];
+
+  void _onSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final lat = (data['latitude'] as num?)?.toDouble();
+      final lng = (data['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+
+      _buses[doc.id] = data;
+      final point = LatLng(lat, lng);
+      final trail = _trails.putIfAbsent(doc.id, () => []);
+      if (trail.isEmpty || trail.last != point) {
+        trail.add(point);
+        if (trail.length > 300) trail.removeAt(0); // cap memory use
+      }
+    }
+    // Drop buses that disappeared from the live query (went offline).
+    _buses.removeWhere((id, _) => !snapshot.docs.any((d) => d.id == id));
+
+    if (!_hasCentered && _buses.isNotEmpty) {
+      _hasCentered = true;
+      final first = _buses.values.first;
+      final lat = (first['latitude'] as num?)?.toDouble();
+      final lng = (first['longitude'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _mapController.move(LatLng(lat, lng), 16);
+        });
+      }
+    }
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppTheme.grey50,
+    appBar: AppBar(
+      title: const Text(
+        'Live Bus Tracking',
+        style: TextStyle(color: AppTheme.grey900),
       ),
-      body: StreamBuilder<List<BusModel>>(
-        stream: _simulationService.simulateMultipleBuses(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary),
-            );
-          }
+      backgroundColor: Colors.white,
+      elevation: 0,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.my_location, color: AppTheme.primary),
+          onPressed: () {
+            if (_buses.isEmpty) return;
+            final first = _buses.values.first;
+            final lat = (first['latitude'] as num?)?.toDouble();
+            final lng = (first['longitude'] as num?)?.toDouble();
+            if (lat != null && lng != null) {
+              _mapController.move(LatLng(lat, lng), 16);
+            }
+          },
+        ),
+      ],
+    ),
+    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _busStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _onSnapshot(snapshot.data!);
+        }
 
-          final buses = snapshot.data!;
+        if (_buses.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'No buses are online right now.\nAsk a driver to go online '
+                'from the Driver dashboard.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
 
-          if (_selectedBus == null && buses.isNotEmpty) {
-            _selectedBus = buses.first;
-          }
-
-          if (_isFollowingBus && _selectedBus != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _mapController.move(_selectedBus!.position, 16);
-            });
-          }
-
-          return Stack(
-            children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: buses.isNotEmpty
-                      ? buses.first.position
-                      : const LatLng(0.3136, 32.5811),
-                  initialZoom: 15,
-                  minZoom: 12,
-                  maxZoom: 18,
-                  onTap: (_, __) => setState(() => _isFollowingBus = false),
+        return Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _defaultCenter,
+                initialZoom: 15,
+                minZoom: 12,
+                maxZoom: 18,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                  subdomains: const ['a', 'b', 'c', 'd'],
+                  userAgentPackageName: 'com.mhl.smart_ride_ug',
                 ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                    subdomains: const ['a', 'b', 'c', 'd'],
-                    userAgentPackageName: 'com.mhl.smart_ride_ug',
-                  ),
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: _routePoints,
-                        strokeWidth: 4,
-                        color: AppTheme.primary,
-                      ),
-                    ],
-                  ),
-                  // 🔥 BUS MARKERS WITH FLOATING INFO — FIXED OVERFLOW
-                  MarkerLayer(
-                    markers: buses.map((bus) {
-                      final isSelected = _selectedBus?.id == bus.id;
-                      final color = bus.seatColor;
-                      return Marker(
-                        point: bus.position,
-                        width: 80,
-                        height: 70,
-                        child: GestureDetector(
-                          onTap: () {
-                            _selectBus(bus);
-                            showModalBottomSheet(
-                              context: context,
-                              backgroundColor: Colors.transparent,
-                              isScrollControlled: true,
-                              builder: (context) => BusPopupWidget(bus: bus),
-                            );
-                          },
-                          child: Column(
-                            children: [
-                              // 🔥 FLOATING INFO BUBBLE — CONTAINED WITH MAX WIDTH
-                              ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth:
-                                      screenWidth * 0.45, // 🔥 Prevent overflow
+                // Real live trails — one polyline per bus, built from real
+                // positions received while this screen has been open.
+                PolylineLayer(
+                  polylines: _trails.entries
+                      .where((e) => e.value.length > 1)
+                      .map(
+                        (e) => Polyline(
+                          points: e.value,
+                          strokeWidth: 4,
+                          color: _colorFor(e.key),
+                        ),
+                      )
+                      .toList(),
+                ),
+                MarkerLayer(
+                  markers: _stops
+                      .map(
+                        (stop) => Marker(
+                          point: stop.position,
+                          width: 34,
+                          height: 34,
+                          child: GestureDetector(
+                            onTap: () =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('📍 ${stop.name}')),
                                 ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.8),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: color,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: BoxDecoration(
-                                          color: color,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 3),
-                                      Flexible(
-                                        child: Text(
-                                          bus.id,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 3),
-                                      Flexible(
-                                        child: Text(
-                                          '${bus.availableSeats} seats',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 7,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.grey300,
+                                  width: 2,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: isSelected ? AppTheme.primary : color,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: color.withValues(alpha: 0.5),
-                                      blurRadius: 10,
-                                      spreadRadius: 3,
-                                    ),
-                                  ],
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.5),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.directions_bus,
-                                  color: Colors.white,
-                                  size: 15,
-                                ),
+                              child: const Icon(
+                                Icons.circle,
+                                color: Color.fromARGB(255, 198, 202, 208),
+                                size: 14,
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  // Start & End markers
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _routePoints.first,
-                        width: 28,
-                        height: 28,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withValues(alpha: 0.4),
-                                blurRadius: 10,
-                                spreadRadius: 3,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.circle,
-                            color: Colors.white,
-                            size: 12,
-                          ),
-                        ),
-                      ),
-                      Marker(
-                        point: _routePoints.last,
-                        width: 28,
-                        height: 28,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.red.withValues(alpha: 0.4),
-                                blurRadius: 10,
-                                spreadRadius: 3,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.flag,
-                            color: Colors.white,
-                            size: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Stops
-                  MarkerLayer(
-                    markers: _stops.map((stop) {
-                      return Marker(
-                        point: stop.position,
-                        width: 32,
-                        height: 32,
-                        child: GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '📍 ${stop.name}\nBuses approaching: 2\nEstimated arrival: 5 min',
+                      )
+                      .toList(),
+                ),
+                MarkerLayer(
+                  markers: _buses.entries.map((entry) {
+                    final busId = entry.key;
+                    final data = entry.value;
+                    final lat = (data['latitude'] as num).toDouble();
+                    final lng = (data['longitude'] as num).toDouble();
+                    final color = _colorFor(busId);
+                    return Marker(
+                      point: LatLng(lat, lng),
+                      width: 50,
+                      height: 50,
+                      child: GestureDetector(
+                        onTap: () => showModalBottomSheet(
+                          context: context,
+                          builder: (_) => Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Bus ${data['busNumber'] ?? busId}',
+                                  style: Theme.of(context).textTheme.titleLarge,
                                 ),
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppTheme.grey300,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
+                                const SizedBox(height: 8),
+                                Text('Status: ${data['status'] ?? 'unknown'}'),
+                                if (data['availableSeats'] != null)
+                                  Text('${data['availableSeats']} seats left'),
                               ],
+                            ),
+                          ),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            margin: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.circle,
-                              color: AppTheme.grey500,
-                              size: 12,
+                              Icons.directions_bus,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const RichAttributionWidget(
-                    attributions: [
-                      TextSourceAttribution('OpenStreetMap contributors'),
-                      TextSourceAttribution('CARTO'),
-                    ],
-                  ),
-                ],
-              ),
-              // 🔥 BOTTOM TAPABLE BAR — FIXED OVERFLOW
-              Positioned(
-                bottom: 16,
-                left: 8,
-                right: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 12,
-                        offset: const Offset(0, 3),
                       ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 6,
-                    horizontal: 8,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Color legend
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildColorDot(Colors.green, 'Available'),
-                          const SizedBox(width: 10),
-                          _buildColorDot(Colors.orange, 'Limited'),
-                          const SizedBox(width: 10),
-                          _buildColorDot(Colors.red, 'Full'),
-                        ],
-                      ),
-                      const Divider(height: 6, thickness: 0.5),
-                      // Bus list
-                      ...buses.map((bus) {
-                        final isSelected = _selectedBus?.id == bus.id;
-                        return GestureDetector(
-                          onTap: () => _selectBus(bus),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 4,
-                              horizontal: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppTheme.primarySoft
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: bus.seatColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  bus.id,
-                                  style: TextStyle(
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    fontSize: 11,
-                                    color: AppTheme.grey900,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    bus.routeName,
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: AppTheme.grey500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${bus.availableSeats} seats',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: bus.seatColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                Icon(
-                                  Icons.chevron_right,
-                                  size: 14,
-                                  color: AppTheme.grey500,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                  ),
+                    );
+                  }).toList(),
                 ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildColorDot(Color color, String label) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 9, color: AppTheme.grey500)),
-      ],
-    );
-  }
+                const RichAttributionWidget(
+                  attributions: [
+                    TextSourceAttribution('OpenStreetMap contributors'),
+                    TextSourceAttribution('CARTO'),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
