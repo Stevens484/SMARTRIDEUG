@@ -4,7 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:smartrideug/features/authentication/authentication_page.dart';
+import 'package:smartrideug/features/home/booking_status_page.dart';
 import 'package:smartrideug/features/home/destination_page.dart';
 import 'package:smartrideug/features/home/help_support_page.dart';
 import 'package:smartrideug/features/home/payment_method_page.dart';
@@ -613,250 +616,107 @@ class _HomeContentState extends State<_HomeContent> {
               ),
             ),
             const SizedBox(height: 8),
-            // Nearby Buses
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
+            // Nearby Buses — now backed by a real live count, tappable
+            GestureDetector(
+              onTap: () => Navigator.of(context).pushNamed('/live-map'),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
                       color: Theme.of(
                         context,
-                      ).colorScheme.onPrimary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      ).colorScheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
                     ),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 24,
-                      height: 24,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Nearby Buses',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '5 buses near you',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimary.withValues(alpha: 0.85),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'View All',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Route Map Card
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Theme.of(
-                  context,
-                ).colorScheme.surface.withValues(alpha: 0.12),
-                border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withValues(alpha: 0.25),
+                  ],
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: Container(
-                      height: 120,
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Stack(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 24,
+                        height: 24,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Positioned.fill(
-                            child: Container(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              child: Stack(
-                                children: [
-                                  Positioned.fill(
-                                    child: Opacity(
-                                      opacity: 0.9,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Theme.of(
-                                                context,
-                                              ).colorScheme.surface,
-                                              Theme.of(context)
-                                                  .colorScheme
-                                                  .surfaceContainerHighest,
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    left: 12,
-                                    top: 12,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.onSurface.withValues(
-                                          alpha: 0.35,
-                                        ),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.location_pin,
-                                            size: 14,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Kampala',
-                                            style: TextStyle(
-                                              color: colorScheme.onSurface,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Icon(
-                                      Icons.map,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.3),
-                                      size: 48,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          Text(
+                            'Nearby Buses',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseFirestore.instance
+                                .collection('busLocations')
+                                .where(
+                                  'status',
+                                  whereIn: [
+                                    'online',
+                                    'moving',
+                                    'approaching_stop',
+                                  ],
+                                )
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final count = snap.data?.docs.length ?? 0;
+                              return Text(
+                                count == 1
+                                    ? '1 bus online now'
+                                    : '$count buses online now',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimary
+                                      .withValues(alpha: 0.85),
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Route map',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'Kampala to Mbarara',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.7),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'View All',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
                         ),
-                        Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '5 active buses',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.7),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
-            // 🔥 FIX 1: Live Map Section with VISIBLE View Full Map button
+            // Live Map — one real map preview, backed by real Firestore data
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -871,7 +731,6 @@ class _HomeContentState extends State<_HomeContent> {
                         color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
-                    // 🔥 NEW: White Gradient Button — VISIBLE!
                     Container(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -917,220 +776,278 @@ class _HomeContentState extends State<_HomeContent> {
                   borderRadius: BorderRadius.circular(14),
                   child: SizedBox(
                     height: 160,
-                    child: Container(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.map, size: 36, color: Colors.grey),
-                            SizedBox(height: 6),
-                            Text(
-                              'Tap "View Full Map" to see live buses',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pushNamed('/live-map'),
+                      child: AbsorbPointer(child: _HomeMiniMap()),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: const [
-                    Icon(Icons.directions_bus, color: Colors.green, size: 14),
-                    SizedBox(width: 4),
-                    Text('5 buses nearby', style: TextStyle(fontSize: 12)),
-                  ],
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('busLocations')
+                      .where(
+                        'status',
+                        whereIn: ['online', 'moving', 'approaching_stop'],
+                      )
+                      .snapshots(),
+                  builder: (context, snap) {
+                    final count = snap.data?.docs.length ?? 0;
+                    return Row(
+                      children: [
+                        const Icon(
+                          Icons.directions_bus,
+                          color: Colors.green,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          count == 1 ? '1 bus nearby' : '$count buses nearby',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            // 🔥 FIX 2: Upcoming Trips — NO OVERFLOW
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Upcoming Trips',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'View All',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // 🔥 FIX: Smaller, tighter trip card
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.12),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withValues(alpha: 0.2),
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: Row(
+            // Upcoming Trips — real data, most recent real booking
+            if (!widget.guestMode && user != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          width: 28,
-                          height: 28,
-                          fit: BoxFit.contain,
+                      Text(
+                        'Upcoming Trips',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Kampala',
-                                  style: TextStyle(
-                                    color: colorScheme.onPrimary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  color: colorScheme.primary,
-                                  size: 11,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Mbarara',
-                                  style: TextStyle(
-                                    color: colorScheme.onPrimary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: Theme.of(context).colorScheme.onPrimary
-                                      .withValues(alpha: 0.8),
-                                  size: 10,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '17 May 2025',
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimary
-                                        .withValues(alpha: 0.8),
-                                    fontSize: 9,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(
-                                  Icons.schedule,
-                                  color: Theme.of(context).colorScheme.onPrimary
-                                      .withValues(alpha: 0.8),
-                                  size: 10,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '10:30 AM',
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimary
-                                        .withValues(alpha: 0.8),
-                                    fontSize: 9,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Text(
-                                  'Seat A12',
-                                  style: TextStyle(
-                                    color: colorScheme.onPrimary,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'UGX 25,000',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(4),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SeatReservationsPage(),
+                          ),
                         ),
                         child: Text(
-                          'Confirmed',
+                          'View All',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontSize: 7,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(height: 8),
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('bookings')
+                        .where('passengerId', isEqualTo: user.uid)
+                        .orderBy('createdAt', descending: true)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final docs = snapshot.data?.docs ?? [];
+                      if (docs.isEmpty) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(14),
+                          child: Text(
+                            'No upcoming trips yet — search a destination to book one.',
+                            style: TextStyle(
+                              color: colorScheme.onPrimary.withValues(
+                                alpha: 0.85,
+                              ),
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      }
+
+                      final booking = docs.first.data();
+                      final bookingId = docs.first.id;
+                      final routeId = booking['routeId']?.toString();
+                      final status = booking['status']?.toString() ?? 'pending';
+                      final seats = List<String>.from(
+                        booking['seats'] as List? ?? const [],
+                      );
+                      final fare = booking['fare'];
+
+                      return GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                BookingStatusPage(bookingId: bookingId),
+                          ),
+                        ),
+                        child:
+                            FutureBuilder<
+                              DocumentSnapshot<Map<String, dynamic>>
+                            >(
+                              future: routeId == null
+                                  ? null
+                                  : FirebaseFirestore.instance
+                                        .collection('routes')
+                                        .doc(routeId)
+                                        .get(),
+                              builder: (context, routeSnap) {
+                                final route = routeSnap.data?.data();
+                                final origin =
+                                    route?['origin']?.toString() ?? '—';
+                                final destination =
+                                    route?['destination']?.toString() ?? '—';
+
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.surface
+                                        .withValues(alpha: 0.12),
+                                    border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surface
+                                          .withValues(alpha: 0.2),
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.all(10),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.directions_bus,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    origin,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color:
+                                                          colorScheme.onPrimary,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.arrow_forward,
+                                                  color: colorScheme.primary,
+                                                  size: 11,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    destination,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color:
+                                                          colorScheme.onPrimary,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  seats.isEmpty
+                                                      ? ''
+                                                      : 'Seat ${seats.join(", ")}',
+                                                  style: TextStyle(
+                                                    color:
+                                                        colorScheme.onPrimary,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                if (fare != null) ...[
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'UGX $fare',
+                                                    style: TextStyle(
+                                                      color:
+                                                          colorScheme.primary,
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          status,
+                                          style: TextStyle(
+                                            color: colorScheme.onPrimary,
+                                            fontSize: 7,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             const SizedBox(height: 16),
             // Your Tools
             Column(
@@ -1300,6 +1217,88 @@ class _HomeContentState extends State<_HomeContent> {
   }
 }
 
+/// Small, real, live preview map shown on the Home tab. Read-only —
+/// tapping anywhere navigates to the full LiveMapScreen instead of
+/// interacting with this map directly.
+class _HomeMiniMap extends StatelessWidget {
+  const _HomeMiniMap();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('busLocations')
+          .where('status', whereIn: ['online', 'moving', 'approaching_stop'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        final points = docs
+            .map((d) {
+              final lat = (d.data()['latitude'] as num?)?.toDouble();
+              final lng = (d.data()['longitude'] as num?)?.toDouble();
+              return (lat != null && lng != null) ? LatLng(lat, lng) : null;
+            })
+            .whereType<LatLng>()
+            .toList();
+
+        if (points.isEmpty) {
+          return Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.map, size: 36, color: Colors.grey),
+                  SizedBox(height: 6),
+                  Text(
+                    'No buses online right now',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final center = points.first;
+        return FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 14,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.none,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate:
+                  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
+              userAgentPackageName: 'com.mhl.smart_ride_ug',
+            ),
+            MarkerLayer(
+              markers: points
+                  .map(
+                    (p) => Marker(
+                      point: p,
+                      width: 26,
+                      height: 26,
+                      child: const Icon(
+                        Icons.directions_bus,
+                        color: AppTheme.primary,
+                        size: 22,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _ToolCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -1385,6 +1384,12 @@ class _BookingsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) {
+      return const Center(child: Text('Sign in to view your bookings.'));
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1402,18 +1407,62 @@ class _BookingsTab extends StatelessWidget {
           style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 20),
-        _StatusCard(
-          title: 'Pending ride',
-          subtitle: 'BUS 101 • Makerere → Ntinda',
-          status: 'Waiting for confirmation',
-          icon: Icons.hourglass_top,
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SeatReservationsPage()),
-          ),
-          child: const Text('Open booking details'),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .where('passengerId', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final docs = snapshot.data!.docs;
+            if (docs.isEmpty) {
+              return const Text('No bookings yet — go book a seat!');
+            }
+            return Column(
+              children: docs.map((doc) {
+                final data = doc.data();
+                final status = data['status']?.toString() ?? 'pending';
+                final seats = List<String>.from(
+                  data['seats'] as List? ?? const [],
+                );
+                IconData icon;
+                switch (status) {
+                  case 'confirmed':
+                    icon = Icons.check_circle;
+                    break;
+                  case 'cancelled':
+                    icon = Icons.cancel;
+                    break;
+                  default:
+                    icon = Icons.hourglass_top;
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _StatusCard(
+                    title: status[0].toUpperCase() + status.substring(1),
+                    subtitle: seats.isEmpty
+                        ? 'Booking ${doc.id.substring(0, 6)}'
+                        : 'Seats: ${seats.join(", ")}',
+                    status: status == 'pending'
+                        ? 'Waiting for confirmation'
+                        : status,
+                    icon: icon,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BookingStatusPage(bookingId: doc.id),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
         ),
       ],
     );
@@ -1611,12 +1660,14 @@ class _StatusCard extends StatelessWidget {
   final String subtitle;
   final String status;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const _StatusCard({
     required this.title,
     required this.subtitle,
     required this.status,
     required this.icon,
+    this.onTap,
   });
 
   @override
@@ -1624,37 +1675,41 @@ class _StatusCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
-              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(status),
-                ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.1),
+                child: Icon(icon, color: Theme.of(context).colorScheme.primary),
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(status),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
