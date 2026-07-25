@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/core/services/authentication_service.dart';
 import 'package:smartrideug/core/services/report_service.dart';
@@ -48,6 +49,16 @@ class AdminDashboardPage extends StatelessWidget {
           icon: const Icon(Icons.person_add_alt_1),
           tooltip: 'Add Staff',
           onPressed: () => _openAddStaffSheet(context),
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Log out',
+          onPressed: () async {
+            await FirebaseAuth.instance.signOut();
+            if (context.mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+            }
+          },
         ),
       ],
     ),

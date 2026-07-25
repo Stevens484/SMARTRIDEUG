@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:smartrideug/core/services/transit_repository.dart';
+import 'package:geolocator/geolocator.dart';
 
 class DriverDashboardPage extends StatefulWidget {
   const DriverDashboardPage({super.key});
@@ -10,71 +13,199 @@ class DriverDashboardPage extends StatefulWidget {
 
 class _DriverDashboardPageState extends State<DriverDashboardPage> {
   bool _online = false;
-  final _bus = TextEditingController();
-  final _route = TextEditingController();
+  bool _starting = false;
+  DateTime? _lastUpdate;
+  StreamSubscription<Position>? _positionSub;
+  final _busId = TextEditingController();
+  final _busNumber = TextEditingController();
+  final _routeId = TextEditingController();
+
   @override
   void dispose() {
-    _bus.dispose();
-    _route.dispose();
+    _positionSub?.cancel();
+    _busId.dispose();
+    _busNumber.dispose();
+    _routeId.dispose();
     super.dispose();
   }
 
-  Future<void> _toggle() async {
-    if (_bus.text.trim().isEmpty) {
+  DocumentReference<Map<String, dynamic>> get _locationRef => FirebaseFirestore
+      .instance
+      .collection('busLocations')
+      .doc(_busId.text.trim());
+
+  Future<bool> _ensureLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Turn on location services to go online.'),
+          ),
+        );
+      }
+      return false;
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission is required.')),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _goOnline() async {
+    if (_busId.text.trim().isEmpty ||
+        _busNumber.text.trim().isEmpty ||
+        _routeId.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter the assigned bus ID first.')),
+        const SnackBar(
+          content: Text('Enter the bus ID, bus number, and route ID first.'),
+        ),
       );
       return;
     }
-    setState(() => _online = !_online);
-    await FirebaseFirestore.instance
-        .collection('busStatus')
-        .doc(_bus.text.trim())
-        .set({
-          'status': _online ? 'online' : 'offline',
-          'routeId': _route.text.trim(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+
+    setState(() => _starting = true);
+    final allowed = await _ensureLocationPermission();
+    if (!allowed) {
+      setState(() => _starting = false);
+      return;
+    }
+
+    // Send one update immediately so passengers see the bus right away,
+    // rather than waiting for the first movement-triggered update.
+    final first = await Geolocator.getCurrentPosition();
+    await _sendUpdate(first, status: 'online');
+
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5, // metres — only re-send once the phone has moved
+      ),
+    ).listen((position) => _sendUpdate(position, status: 'moving'));
+
+    setState(() {
+      _online = true;
+      _starting = false;
+    });
+  }
+
+  Future<void> _sendUpdate(Position position, {required String status}) async {
+    // Read live seat availability so passengers see an accurate count,
+    // not a number that goes stale the moment a seat is booked.
+    int? availableSeats;
+    try {
+      final busDoc = await FirebaseFirestore.instance
+          .collection('buses')
+          .doc(_busId.text.trim())
+          .get();
+      final total = (busDoc.data()?['totalSeats'] as num?)?.toInt() ?? 32;
+      final reserved = (busDoc.data()?['reservedSeats'] as List?)?.length ?? 0;
+      availableSeats = total - reserved;
+    } catch (_) {
+      // If this read fails, still send the location update below.
+    }
+
+    await _locationRef.set({
+      'routeId': _routeId.text.trim(),
+      'busNumber': _busNumber.text.trim(),
+      'status': status,
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      if (availableSeats != null) 'availableSeats': availableSeats,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (mounted) setState(() => _lastUpdate = DateTime.now());
+  }
+
+  Future<void> _goOffline() async {
+    await _positionSub?.cancel();
+    _positionSub = null;
+    if (_busId.text.trim().isNotEmpty) {
+      await _locationRef.set({
+        'status': 'offline',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    setState(() => _online = false);
+  }
+
+  Future<void> _logout() async {
+    await _goOffline();
+    if (!mounted) return;
+    await FirebaseAuth.instance.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Driver dashboard')),
+    appBar: AppBar(
+      title: const Text('Driver dashboard'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Log out',
+          onPressed: _logout,
+        ),
+      ],
+    ),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text('Shift control', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 12),
         TextField(
-          controller: _bus,
-          decoration: const InputDecoration(labelText: 'Assigned bus ID'),
+          controller: _busId,
+          enabled: !_online,
+          decoration: const InputDecoration(
+            labelText: 'Bus ID (matches Firestore document, e.g. bus001)',
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
-          controller: _route,
+          controller: _busNumber,
+          enabled: !_online,
+          decoration: const InputDecoration(
+            labelText: 'Bus number shown to passengers (e.g. 14)',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _routeId,
+          enabled: !_online,
           decoration: const InputDecoration(labelText: 'Current route ID'),
         ),
         const SizedBox(height: 16),
         SwitchListTile(
           value: _online,
-          onChanged: (_) => _toggle(),
-          title: Text(_online ? 'Online — sharing live status' : 'Offline'),
-          subtitle: const Text(
-            'GPS updates should be sent by your location service while online.',
+          onChanged: _starting
+              ? null
+              : (value) => value ? _goOnline() : _goOffline(),
+          title: Text(
+            _starting
+                ? 'Starting...'
+                : _online
+                ? 'Online — sharing real live location'
+                : 'Offline',
           ),
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          onPressed: _online
-              ? () => TransitRepository().updateBusLocation(
-                  busId: _bus.text.trim(),
-                  latitude: 0.3476,
-                  longitude: 32.5825,
-                  status: 'moving',
-                )
-              : null,
-          icon: const Icon(Icons.my_location),
-          label: const Text('Send current location update'),
+          subtitle: Text(
+            _online && _lastUpdate != null
+                ? 'Last update: ${_lastUpdate!.hour.toString().padLeft(2, '0')}:'
+                      '${_lastUpdate!.minute.toString().padLeft(2, '0')}:'
+                      '${_lastUpdate!.second.toString().padLeft(2, '0')}'
+                : 'Your phone\'s real GPS position is sent automatically '
+                      'while online.',
+          ),
         ),
         const SizedBox(height: 24),
         Text(
@@ -87,16 +218,18 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
               .where('status', whereIn: ['pending', 'confirmed'])
               .snapshots(),
           builder: (_, s) {
-            if (!s.hasData)
+            if (!s.hasData) {
               return const Padding(
                 padding: EdgeInsets.all(24),
                 child: CircularProgressIndicator(),
               );
-            if (s.data!.docs.isEmpty)
+            }
+            if (s.data!.docs.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.all(24),
                 child: Text('No passengers waiting.'),
               );
+            }
             return Column(
               children: s.data!.docs
                   .map(

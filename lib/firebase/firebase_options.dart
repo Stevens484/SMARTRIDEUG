@@ -1,33 +1,12 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 
 class DefaultFirebaseOptions {
-  static FirebaseOptions get android => const FirebaseOptions(
-    apiKey: 'AIzaSyAmNXXFiqPUH-SspNPRUG11cktszM6Ls7M',
-    appId: '1:398858755798:android:08b91bf10b904b6b30b377',
-    messagingSenderId: '398858755798',
-    projectId: 'smartride-mobileapp001',
-    storageBucket: 'smartride-mobileapp001.firebasestorage.app',
+  static const FirebaseOptions currentPlatform = FirebaseOptions(
+    apiKey: 'AIzaSyCTatcEGfyuDDz0XsZvR9M4-VTwxobdkec',
+    appId: '1:176470873537:android:0c660378b99db9407fcb40',
+    messagingSenderId: '176470873537',
+    projectId: 'smartrideug-fahad',
+    authDomain: 'smartrideug-fahad.firebaseapp.com',
+    storageBucket: 'smartrideug-fahad.firebasestorage.app',
   );
-
-  static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web.',
-      );
-    }
-
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return android;
-      case TargetPlatform.iOS:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-      case TargetPlatform.linux:
-      case TargetPlatform.fuchsia:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for $defaultTargetPlatform.',
-        );
-    }
-  }
 }
