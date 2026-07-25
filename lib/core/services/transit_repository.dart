@@ -34,6 +34,8 @@ class TransitRepository {
     required String routeId,
     required List<String> seats,
     required int farePerSeat,
+    double? pickupLatitude,
+    double? pickupLongitude,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Please sign in to reserve a seat.');
@@ -46,9 +48,9 @@ class TransitRepository {
       if (seats.any(taken.contains)) {
         throw StateError('One or more selected seats are no longer available.');
       }
-      transaction.update(busRef, {
+      transaction.set(busRef, {
         'reservedSeats': [...taken, ...seats],
-      });
+      }, SetOptions(merge: true));
       transaction.set(bookingRef, {
         'passengerId': user.uid,
         'busId': busId,
@@ -57,6 +59,8 @@ class TransitRepository {
         'fare': farePerSeat * seats.length,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
+        if (pickupLatitude != null) 'pickupLatitude': pickupLatitude,
+        if (pickupLongitude != null) 'pickupLongitude': pickupLongitude,
       });
       transaction.set(reservationRef, {
         'bookingId': bookingRef.id,

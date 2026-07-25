@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:smartrideug/core/services/transit_repository.dart';
 import 'package:smartrideug/features/home/booking_status_page.dart';
 
@@ -42,12 +43,36 @@ class _ConfirmSeatPageState extends State<ConfirmSeatPage> {
 
     setState(() => _isReserving = true);
 
+    // Capture the passenger's real location once, as their pickup point —
+    // this is best-effort: if permission is denied or location is off, the
+    // booking still goes through, just without a pickup point attached.
+    double? pickupLat;
+    double? pickupLng;
+    try {
+      if (await Geolocator.isLocationServiceEnabled()) {
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.always ||
+            permission == LocationPermission.whileInUse) {
+          final position = await Geolocator.getCurrentPosition();
+          pickupLat = position.latitude;
+          pickupLng = position.longitude;
+        }
+      }
+    } catch (_) {
+      // Location capture is best-effort — proceed without it.
+    }
+
     try {
       final bookingId = await TransitRepository().reserveSeats(
         busId: widget.busId,
         routeId: widget.routeId,
         seats: widget.seats,
         farePerSeat: widget.farePerSeat,
+        pickupLatitude: pickupLat,
+        pickupLongitude: pickupLng,
       );
 
       if (!mounted) return;
