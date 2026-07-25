@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 class DriverDashboardPage extends StatefulWidget {
   const DriverDashboardPage({super.key});
@@ -239,12 +241,35 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                         subtitle: Text(
                           'Seats: ${(d.data()['seats'] ?? []).join(', ')}',
                         ),
-                        trailing: FilledButton(
-                          onPressed: () => d.reference.update({
-                            'status': 'boarded',
-                            'boardedAt': FieldValue.serverTimestamp(),
-                          }),
-                          child: const Text('Boarded'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (d.data()['pickupLatitude'] != null &&
+                                d.data()['pickupLongitude'] != null)
+                              IconButton(
+                                icon: const Icon(Icons.location_pin),
+                                tooltip: 'View pickup location',
+                                onPressed: () => showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (_) => _PickupLocationSheet(
+                                    latitude:
+                                        (d.data()['pickupLatitude'] as num)
+                                            .toDouble(),
+                                    longitude:
+                                        (d.data()['pickupLongitude'] as num)
+                                            .toDouble(),
+                                  ),
+                                ),
+                              ),
+                            FilledButton(
+                              onPressed: () => d.reference.update({
+                                'status': 'boarded',
+                                'boardedAt': FieldValue.serverTimestamp(),
+                              }),
+                              child: const Text('Boarded'),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -252,6 +277,60 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                   .toList(),
             );
           },
+        ),
+      ],
+    ),
+  );
+}
+
+/// Shown when a driver taps the pin next to a waiting passenger — the
+/// passenger's real, one-time-captured pickup location.
+class _PickupLocationSheet extends StatelessWidget {
+  const _PickupLocationSheet({required this.latitude, required this.longitude});
+  final double latitude;
+  final double longitude;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 320,
+    child: Column(
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(12),
+          child: Text(
+            'Passenger pickup location',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        Expanded(
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: LatLng(latitude, longitude),
+              initialZoom: 16,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.mhl.smart_ride_ug',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(latitude, longitude),
+                    width: 36,
+                    height: 36,
+                    child: const Icon(
+                      Icons.location_pin,
+                      color: Colors.red,
+                      size: 36,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     ),
