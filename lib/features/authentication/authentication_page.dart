@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/core/services/authentication_service.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
+import 'package:smartrideug/core/services/local_notification_service.dart';
 import 'package:smartrideug/features/admin/admin_dashboard_page.dart';
 import 'package:smartrideug/features/driver/driver_dashboard_page.dart';
 import 'package:smartrideug/features/home/home_page.dart';
@@ -29,9 +30,10 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
   final _password = TextEditingController();
   final _name = TextEditingController();
   late bool _register = widget.operator ? false : widget.register;
-  late bool _operator = widget.operator;
-  late String _role = widget.role;
+  late final bool _operator = widget.operator;
+  late final String _role = widget.role;
   bool _busy = false;
+  bool _passwordVisible = false;
 
   @override
   void dispose() {
@@ -93,6 +95,10 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
           await auth.signInWithEmail(_email.text, _password.text);
         }
       }
+      if (!_operator && await auth.claimWelcomeNotification()) {
+        await LocalNotificationService.instance.requestPermission();
+        await LocalNotificationService.instance.showWelcome();
+      }
       await _goToRoleHome();
     } catch (e) {
       if (mounted) {
@@ -125,10 +131,11 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppTheme.grey50,
     appBar: AppBar(
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.navy,
+      foregroundColor: Colors.white,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: AppTheme.grey700),
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
     ),
@@ -155,7 +162,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                       shape: BoxShape.circle,
                     ),
                     child: Image.asset(
-                      'assets/images/logo.png',
+                      'assets/images/smartride_mark.png',
                       width: 48,
                       height: 48,
                       fit: BoxFit.contain,
@@ -188,10 +195,25 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
 
                   TextField(
                     controller: _password,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_passwordVisible,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: InputDecoration(
                       labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock_outline),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        tooltip: _passwordVisible
+                            ? 'Hide password'
+                            : 'Show password',
+                        icon: Icon(
+                          _passwordVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _passwordVisible = !_passwordVisible,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

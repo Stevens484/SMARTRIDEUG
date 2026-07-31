@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:smartrideug/core/services/local_notification_service.dart';
+import 'package:smartrideug/core/services/transit_repository.dart';
+import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/home/booking_confirmed_page.dart';
+import 'package:smartrideug/features/home/momo_payment_page.dart';
 
 class BookingStatusPage extends StatefulWidget {
   final String bookingId;
@@ -13,108 +19,57 @@ class BookingStatusPage extends StatefulWidget {
 }
 
 class _BookingStatusPageState extends State<BookingStatusPage> {
-  bool _isCancelling = false;
-  bool _autoCancellationScheduled = false;
-  bool _expired = false;
+  bool _isUpdating = false;
+  bool _checkingArrival = false;
+  Timer? _expiryTimer;
+  int? _scheduledExpiryMilliseconds;
+  StreamSubscription<ArrivalNotificationAction>? _actionSubscription;
 
   DocumentReference<Map<String, dynamic>> get _bookingRef =>
       FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId);
 
-  Future<void> _writeNotification(String title, String body) async {
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return;
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'userId': uid,
-        'title': title,
-        'body': body,
-        'read': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (error) {
-      // A missing notification shouldn't break the booking flow itself.
-      debugPrint('Could not write notification: $error');
-    }
+  @override
+  void initState() {
+    super.initState();
+    _actionSubscription = LocalNotificationService.instance.actions.listen((
+      action,
+    ) {
+      if (action.bookingId != widget.bookingId) return;
+      if (action.actionId == 'confirm') {
+        _confirmBooking();
+      } else if (action.actionId == 'cancel') {
+        _cancelBooking();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _expiryTimer?.cancel();
+    _actionSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _confirmBooking() async {
+    if (_isUpdating) return;
+    setState(() => _isUpdating = true);
     try {
-      await _bookingRef.update({'status': 'confirmed'});
-      await _writeNotification(
-        'Booking confirmed',
-        'Your seat booking is confirmed. Have a safe trip!',
-      );
+      final snapshot = await _bookingRef.get();
+      final booking = snapshot.data();
+      final expiresAt = booking?['expiresAt'];
+      if (booking == null || expiresAt is! Timestamp) {
+        throw StateError('Your payment window is not available.');
+      }
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => BookingConfirmedPage(bookingId: widget.bookingId),
+          builder: (_) => MomoPaymentPage(
+            bookingId: widget.bookingId,
+            fare: (booking['fare'] as num?)?.toInt() ?? 0,
+            expiresAt: expiresAt.toDate(),
+          ),
         ),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
-    }
-  }
-
-  Future<void> _cancelAndRelease(
-    Map<String, dynamic> booking, {
-    bool expired = false,
-  }) async {
-    setState(() => _isCancelling = true);
-
-    try {
-      final busId = booking['busId']?.toString();
-      if (busId == null || busId.isEmpty) {
-        throw StateError('The booking does not have a bus assigned.');
-      }
-      final seats = List<String>.from(booking['seats'] as List? ?? const []);
-      final reservationSnapshot = await FirebaseFirestore.instance
-          .collection('seatReservations')
-          .where('bookingId', isEqualTo: widget.bookingId)
-          .limit(1)
-          .get();
-      final reservationRef = reservationSnapshot.docs.isEmpty
-          ? null
-          : reservationSnapshot.docs.first.reference;
-      final busRef = FirebaseFirestore.instance.collection('buses').doc(busId);
-
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final currentBooking = await transaction.get(_bookingRef);
-        if (!currentBooking.exists) {
-          throw StateError('This booking is no longer available.');
-        }
-        if (currentBooking.data()?['status'] != 'pending') {
-          throw StateError('This booking can no longer be cancelled.');
-        }
-
-        final bus = await transaction.get(busRef);
-        final reservedSeats = List<String>.from(
-          bus.data()?['reservedSeats'] as List? ?? const [],
-        );
-        transaction.update(_bookingRef, {'status': 'cancelled'});
-        transaction.update(busRef, {
-          'reservedSeats': reservedSeats
-              .where((seat) => !seats.contains(seat))
-              .toList(),
-        });
-        if (reservationRef != null) {
-          transaction.update(reservationRef, {'status': 'cancelled'});
-        }
-      });
-
-      await _writeNotification(
-        expired ? 'Reservation expired' : 'Booking cancelled',
-        expired
-            ? 'Your seat reservation expired before you confirmed, so it '
-                  'was released.'
-            : 'You cancelled your seat booking.',
-      );
-
-      if (expired && mounted) {
-        setState(() => _expired = true);
-      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -122,10 +77,88 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
         ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
-      if (mounted) {
-        setState(() => _isCancelling = false);
-      }
+      if (mounted) setState(() => _isUpdating = false);
     }
+  }
+
+  Future<void> _cancelBooking() async {
+    if (_isUpdating) return;
+    setState(() => _isUpdating = true);
+    try {
+      await TransitRepository().cancelBooking(widget.bookingId);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
+  Future<void> _expireBooking() async {
+    try {
+      await TransitRepository().expireBooking(widget.bookingId);
+    } catch (_) {
+      // The stream will continue to show the pending state if a network error
+      // occurs, allowing the next foreground update to try again safely.
+    }
+  }
+
+  void _scheduleExpiry(Map<String, dynamic> booking) {
+    final expiresAt = booking['expiresAt'];
+    if (expiresAt is! Timestamp) return;
+    final milliseconds = expiresAt.millisecondsSinceEpoch;
+    if (_scheduledExpiryMilliseconds == milliseconds) return;
+    _scheduledExpiryMilliseconds = milliseconds;
+    _expiryTimer?.cancel();
+    final delay = expiresAt.toDate().difference(DateTime.now());
+    _expiryTimer = Timer(
+      delay.isNegative ? Duration.zero : delay,
+      _expireBooking,
+    );
+  }
+
+  void _watchArrival({
+    required Map<String, dynamic> booking,
+    required Map<String, dynamic> bus,
+    required Map<String, dynamic> stop,
+  }) {
+    if (_checkingArrival || booking['arrivalNotifiedAt'] != null) return;
+    final latitude = bus['latitude'];
+    final longitude = bus['longitude'];
+    final stopLatitude = stop['latitude'];
+    final stopLongitude = stop['longitude'];
+    if (latitude is! num ||
+        longitude is! num ||
+        stopLatitude is! num ||
+        stopLongitude is! num) {
+      return;
+    }
+    final metres = Geolocator.distanceBetween(
+      latitude.toDouble(),
+      longitude.toDouble(),
+      stopLatitude.toDouble(),
+      stopLongitude.toDouble(),
+    );
+    if (metres > 100) return;
+
+    _checkingArrival = true;
+    unawaited(() async {
+      try {
+        final opened = await TransitRepository().markBusArrived(
+          widget.bookingId,
+        );
+        if (opened) {
+          await LocalNotificationService.instance.showBusArrival(
+            widget.bookingId,
+          );
+        }
+      } finally {
+        _checkingArrival = false;
+      }
+    }());
   }
 
   @override
@@ -139,7 +172,6 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
             if (!bookingSnapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-
             final booking = bookingSnapshot.data!.data();
             if (booking == null) {
               return const Center(
@@ -147,221 +179,55 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
               );
             }
             final status = booking['status']?.toString() ?? 'unknown';
+            if (status != 'pending_confirmation') {
+              return _content(
+                booking: booking,
+                status: status,
+                readyToConfirm: false,
+              );
+            }
 
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            _scheduleExpiry(booking);
+            final busId = booking['busId']?.toString() ?? '';
+            final stopId = booking['pickupStopId']?.toString() ?? '';
+            final routeId = booking['routeId']?.toString() ?? '';
+            if (busId.isEmpty || stopId.isEmpty || routeId.isEmpty) {
+              return _content(
+                booking: booking,
+                status: status,
+                readyToConfirm: false,
+              );
+            }
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
-                  .collection('seatReservations')
-                  .where('bookingId', isEqualTo: widget.bookingId)
-                  .limit(1)
+                  .collection('buses')
+                  .doc(busId)
                   .snapshots(),
-              builder: (context, reservationSnapshot) {
-                if (!reservationSnapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final reservation = reservationSnapshot.data!.docs.isEmpty
-                    ? null
-                    : reservationSnapshot.data!.docs.first.data();
-                final expiresAt = reservation?['expiresAt'] as Timestamp?;
-                final hasExpired =
-                    status == 'pending' &&
-                    expiresAt != null &&
-                    DateTime.now().isAfter(expiresAt.toDate());
-                if (hasExpired && !_autoCancellationScheduled) {
-                  _autoCancellationScheduled = true;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) _cancelAndRelease(booking, expired: true);
-                  });
-                }
-
-                var icon = Icons.help_outline;
-                var color = Colors.grey;
-                var title = status;
-                var subtitle = 'Unknown booking status';
-                switch (status) {
-                  case 'pending':
-                    icon = Icons.hourglass_top;
-                    color = Colors.orange;
-                    title = 'Pending';
-                    subtitle = 'Waiting for you to confirm';
-                    break;
-                  case 'confirmed':
-                    icon = Icons.check_circle;
-                    color = Colors.green;
-                    title = 'Confirmed';
-                    subtitle = "You're all set";
-                    break;
-                  case 'cancelled':
-                    icon = Icons.cancel;
-                    color = Colors.red;
-                    title = 'Cancelled';
-                    subtitle = _expired
-                        ? 'This reservation expired before you confirmed.'
-                        : 'This booking was cancelled';
-                    break;
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      // 🔥 Status Card
-                      Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(icon, color: color, size: 28),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      title,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                        color: color,
-                                      ),
-                                    ),
-                                    Text(
-                                      subtitle,
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // 🔥 Booking Details
-                      Card(
-                        elevation: 1,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Booking Details',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _detailRow('Booking ID', widget.bookingId),
-                              _detailRow(
-                                'Bus',
-                                booking['busNumber']?.toString() ?? 'N/A',
-                              ),
-                              _detailRow(
-                                'Route',
-                                booking['routeName']?.toString() ?? 'N/A',
-                              ),
-                              _detailRow(
-                                'Seats',
-                                (booking['seats'] as List?)?.join(', ') ??
-                                    'N/A',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      // 🔥 Action Buttons (only show if pending)
-                      if (status == 'pending') ...[
-                        SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: ElevatedButton(
-                            onPressed: _isCancelling ? null : _confirmBooking,
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              "I'm Ready — Confirm Trip",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: OutlinedButton(
-                            onPressed: _isCancelling
-                                ? null
-                                : () => _cancelAndRelease(booking),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.red),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: _isCancelling
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Cancel Booking',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                          ),
-                        ),
-                      ],
-
-                      // 🔥 Back to Home button (when booking is done)
-                      if (status == 'confirmed' || status == 'cancelled') ...[
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(
-                              context,
-                            ).popUntil((route) => route.isFirst),
-                            child: const Text('Go Home'),
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 16),
-                    ],
-                  ),
+              builder: (context, busSnapshot) {
+                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('routes')
+                      .doc(routeId)
+                      .collection('stops')
+                      .doc(stopId)
+                      .snapshots(),
+                  builder: (context, stopSnapshot) {
+                    final bus = busSnapshot.data?.data();
+                    final stop = stopSnapshot.data?.data();
+                    if (bus != null && stop != null) {
+                      _watchArrival(booking: booking, bus: bus, stop: stop);
+                    }
+                    final expiresAt = booking['expiresAt'];
+                    final readyToConfirm =
+                        booking['arrivalNotifiedAt'] != null &&
+                        expiresAt is Timestamp &&
+                        expiresAt.toDate().isAfter(DateTime.now());
+                    return _content(
+                      booking: booking,
+                      status: status,
+                      readyToConfirm: readyToConfirm,
+                    );
+                  },
                 );
               },
             );
@@ -371,27 +237,206 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
     );
   }
 
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+  Widget _content({
+    required Map<String, dynamic> booking,
+    required String status,
+    required bool readyToConfirm,
+  }) {
+    var icon = Icons.help_outline;
+    var color = AppTheme.grey500;
+    var title = status;
+    var subtitle = 'Unknown booking status';
+    switch (status) {
+      case 'pending_confirmation':
+        icon = readyToConfirm ? Icons.directions_bus : Icons.hourglass_top;
+        color = readyToConfirm ? AppTheme.primary : AppTheme.navy;
+        title = readyToConfirm ? 'Your bus has arrived' : 'Seat held';
+        subtitle = readyToConfirm
+            ? 'Are you ready to board? Confirm within 2 minutes.'
+            : 'We will alert you when your bus reaches the pickup stop.';
+        break;
+      case 'confirmed':
+        icon = Icons.check_circle;
+        color = AppTheme.success;
+        title = 'Confirmed';
+        subtitle = "You're all set";
+        break;
+      case 'cancelled':
+      case 'expired':
+        icon = Icons.cancel;
+        color = Colors.red;
+        title = status == 'expired' ? 'Expired' : 'Cancelled';
+        subtitle = status == 'expired'
+            ? 'Your temporary seat hold has been released.'
+            : 'Your temporary seat hold has been released.';
+        break;
+    }
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: color,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Booking Details',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                _detailRow('Booking ID', widget.bookingId),
+                _detailRow('Bus', booking['busNumber']?.toString() ?? 'N/A'),
+                _detailRow('Route', booking['routeName']?.toString() ?? 'N/A'),
+                _detailRow(
+                  'Pickup',
+                  booking['pickupStopName']?.toString() ?? 'N/A',
+                ),
+                _detailRow(
+                  'Seats',
+                  (booking['seats'] as List?)?.join(', ') ?? 'N/A',
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        if (status == 'pending_confirmation' && readyToConfirm) ...[
           SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isUpdating ? null : _confirmBooking,
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                "I'm Ready — Confirm Trip",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
-          ),
+          const SizedBox(height: 12),
         ],
-      ),
+        if (status == 'pending_confirmation')
+          SizedBox(
+            height: 48,
+            child: OutlinedButton(
+              onPressed: _isUpdating ? null : _cancelBooking,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isUpdating
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Cancel Booking',
+                      style: TextStyle(color: Colors.red),
+                    ),
+            ),
+          ),
+        if (status == 'confirmed') ...[
+          SizedBox(
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      BookingConfirmedPage(bookingId: widget.bookingId),
+                ),
+              ),
+              icon: const Icon(Icons.qr_code_2),
+              label: const Text('View QR Ticket'),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if ({'confirmed', 'cancelled', 'expired'}.contains(status))
+          SizedBox(
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
+              child: const Text('Go Home'),
+            ),
+          ),
+      ],
     );
   }
+
+  Widget _detailRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+          ),
+        ),
+      ],
+    ),
+  );
 }

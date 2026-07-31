@@ -1,0 +1,209 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function isAdmin() {
+      return signedIn() && get(userPath(request.auth.uid)).data.role == 'admin';
+    }
+    function isDriver() {
+      return signedIn() && get(userPath(request.auth.uid)).data.role == 'driver';
+    }
+    function isAssignedDriver(busId) {
+      return isDriver() &&
+        (get(userPath(request.auth.uid)).data.assignedBusId == busId ||
+         get(/databases/$(database)/documents/buses/$(busId)).data.driverId == request.auth.uid);
+    }
+    function bookingPath(bookingId) {
+      return /databases/$(database)/documents/bookings/$(bookingId);
+    }
+    function validSeatLists(bus) {
+      return bus.totalSeats is int && bus.totalSeats > 0 &&
+        bus.reservedSeats is list && bus.pendingSeats is list &&
+        bus.reservedSeats.size() <= bus.totalSeats &&
+        bus.pendingSeats.size() <= bus.totalSeats &&
+        bus.reservedSeats.toSet().size() == bus.reservedSeats.size() &&
+        bus.pendingSeats.toSet().size() == bus.pendingSeats.size() &&
+        bus.reservedSeats.toSet().intersection(bus.pendingSeats.toSet()).size() == 0 &&
+        bus.availableSeats == bus.totalSeats - bus.reservedSeats.size() - bus.pendingSeats.size();
+    }
+    function onlySeatFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'pendingSeats', 'reservedSeats', 'availableSeats', 'activeBookingId', 'updatedAt'
+      ]);
+    }
+    function seatMutationForBooking(busId) {
+      let bookingId = request.resource.data.activeBookingId;
+      let after = getAfter(bookingPath(bookingId)).data;
+      return bookingId is string &&
+        after.passengerId == request.auth.uid &&
+        after.busId == busId &&
+        onlySeatFieldsChanged() && validSeatLists(request.resource.data) &&
+        (
+          // Initial booking: only the temporary hold list changes.
+          (!exists(bookingPath(bookingId)) && after.status == 'pending_confirmation' &&
+           request.resource.data.reservedSeats == resource.data.reservedSeats &&
+           request.resource.data.pendingSeats.toSet().difference(
+             resource.data.pendingSeats.toSet()
+           ).hasOnly(after.seats) &&
+           resource.data.pendingSeats.toSet().difference(
+             request.resource.data.pendingSeats.toSet()
+           ).size() == 0) ||
+          // Confirmation: held seats move to the confirmed list.
+          (exists(bookingPath(bookingId)) &&
+           get(bookingPath(bookingId)).data.passengerId == request.auth.uid &&
+           get(bookingPath(bookingId)).data.status == 'pending_confirmation' &&
+           after.status == 'confirmed' &&
+           after.readyConfirmed == true &&
+           after.paymentStatus == 'paid_simulated' &&
+           after.paymentMethod == 'mtn_momo_simulated' &&
+           after.paymentReference is string && after.paymentReference.size() <= 80 &&
+           after.ticketToken is string && after.ticketToken.size() <= 160 &&
+           resource.data.pendingSeats.toSet().difference(
+             request.resource.data.pendingSeats.toSet()
+           ).hasOnly(get(bookingPath(bookingId)).data.seats) &&
+           request.resource.data.pendingSeats.toSet().difference(
+             resource.data.pendingSeats.toSet()
+           ).size() == 0 &&
+           request.resource.data.reservedSeats.toSet().difference(
+             resource.data.reservedSeats.toSet()
+           ).hasOnly(get(bookingPath(bookingId)).data.seats) &&
+           resource.data.reservedSeats.toSet().difference(
+             request.resource.data.reservedSeats.toSet()
+           ).size() == 0) ||
+          // Cancellation or expiry: only the temporary hold is released.
+          (exists(bookingPath(bookingId)) &&
+           get(bookingPath(bookingId)).data.passengerId == request.auth.uid &&
+           get(bookingPath(bookingId)).data.status == 'pending_confirmation' &&
+           after.status in ['cancelled', 'expired'] &&
+           request.resource.data.reservedSeats == resource.data.reservedSeats &&
+           resource.data.pendingSeats.toSet().difference(
+             request.resource.data.pendingSeats.toSet()
+           ).hasOnly(get(bookingPath(bookingId)).data.seats) &&
+           request.resource.data.pendingSeats.toSet().difference(
+             resource.data.pendingSeats.toSet()
+           ).size() == 0)
+        );
+    }
+    function validNewBooking() {
+      return request.resource.data.keys().hasOnly([
+          'bookingId', 'passengerId', 'busId', 'busNumber', 'routeId', 'routeName',
+          'pickupStopId', 'pickupStopName', 'seats', 'farePerSeat', 'fare', 'status', 'readyConfirmed',
+          'arrivalNotifiedAt', 'expiresAt', 'paymentStatus', 'paymentMethod',
+          'paymentReference', 'ticketToken', 'paidAt', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.bookingId == request.resource.id &&
+        request.resource.data.passengerId == request.auth.uid &&
+        request.resource.data.busId is string && request.resource.data.routeId is string &&
+        request.resource.data.pickupStopId is string && request.resource.data.pickupStopName is string &&
+        request.resource.data.pickupStopName.size() > 0 && request.resource.data.pickupStopName.size() <= 120 &&
+        request.resource.data.seats is list &&
+        request.resource.data.seats.size() > 0 && request.resource.data.seats.size() <= 10 &&
+        request.resource.data.seats.toSet().size() == request.resource.data.seats.size() &&
+        request.resource.data.farePerSeat is int && request.resource.data.farePerSeat >= 0 &&
+        request.resource.data.fare == request.resource.data.farePerSeat * request.resource.data.seats.size() &&
+        request.resource.data.status == 'pending_confirmation' &&
+        request.resource.data.readyConfirmed == false &&
+        request.resource.data.arrivalNotifiedAt == null && request.resource.data.expiresAt == null &&
+        request.resource.data.paymentStatus == null && request.resource.data.paymentMethod == null &&
+        request.resource.data.paymentReference == null && request.resource.data.ticketToken == null &&
+        request.resource.data.paidAt == null &&
+        request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+    }
+    function ownedBooking() {
+      return signedIn() && resource.data.passengerId == request.auth.uid &&
+        request.resource.data.passengerId == resource.data.passengerId;
+    }
+    function opensArrivalWindow() {
+      return resource.data.status == 'pending_confirmation' &&
+        resource.data.arrivalNotifiedAt == null &&
+        request.resource.data.status == 'pending_confirmation' &&
+        request.resource.data.readyConfirmed == false &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'arrivalNotifiedAt', 'expiresAt', 'updatedAt'
+        ]) && request.resource.data.arrivalNotifiedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.expiresAt < request.time + duration.value(3, 'm') &&
+        request.resource.data.updatedAt == request.time;
+    }
+    function bookingSeatTransition() {
+      let bus = getAfter(/databases/$(database)/documents/buses/$(resource.data.busId)).data;
+      return bus.activeBookingId == resource.id &&
+        request.resource.data.status in ['confirmed', 'cancelled', 'expired'] &&
+        (request.resource.data.status != 'confirmed' ||
+          (request.resource.data.readyConfirmed == true &&
+           resource.data.expiresAt is timestamp && resource.data.expiresAt > request.time &&
+           request.resource.data.paymentStatus == 'paid_simulated' &&
+           request.resource.data.paymentMethod == 'mtn_momo_simulated' &&
+           request.resource.data.paymentReference is string &&
+           request.resource.data.paymentReference.size() <= 80 &&
+           request.resource.data.ticketToken is string &&
+           request.resource.data.ticketToken.size() <= 160 &&
+           request.resource.data.paidAt == request.time)) &&
+        (request.resource.data.status != 'expired' ||
+          (resource.data.expiresAt is timestamp && resource.data.expiresAt <= request.time)) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'readyConfirmed', 'paymentStatus', 'paymentMethod',
+          'paymentReference', 'ticketToken', 'paidAt', 'confirmedAt',
+          'cancelledAt', 'expiredAt', 'updatedAt'
+        ]) && request.resource.data.updatedAt == request.time;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn() && request.auth.uid == userId &&
+        request.resource.data.role == 'passenger';
+      allow update: if signedIn() && request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
+
+      match /paymentMethods/{methodId} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow create, update: if signedIn() && request.auth.uid == userId &&
+          request.resource.data.keys().hasOnly([
+            'provider', 'title', 'phone', 'subtitle', 'isDefault', 'createdAt', 'updatedAt'
+          ]) &&
+          request.resource.data.provider == 'mtn_momo_simulated' &&
+          request.resource.data.title == 'MTN MoMo' &&
+          request.resource.data.phone is string && request.resource.data.phone.size() <= 32 &&
+          request.resource.data.subtitle is string && request.resource.data.subtitle.size() <= 80 &&
+          request.resource.data.isDefault is bool &&
+          request.resource.data.createdAt is timestamp && request.resource.data.updatedAt is timestamp;
+        allow delete: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /routes/{routeId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+      match /stops/{stopId} {
+        allow read: if signedIn();
+        allow write: if isAdmin();
+      }
+    }
+
+    match /stops/{stopId} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /busLocations/{busId} { allow read: if signedIn(); allow write: if isAdmin() || isAssignedDriver(busId); }
+
+    match /buses/{busId} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || seatMutationForBooking(busId) ||
+        (isAssignedDriver(busId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'latitude', 'longitude', 'status', 'speed', 'heading', 'updatedAt'
+        ]));
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if signedIn() &&
+        (resource.data.passengerId == request.auth.uid || isAdmin() || isAssignedDriver(resource.data.busId));
+      allow create: if signedIn() && validNewBooking();
+      allow update: if isAdmin() || (ownedBooking() && (opensArrivalWindow() || bookingSeatTransition()));
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{reportId} { allow read, write: if isAdmin(); }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

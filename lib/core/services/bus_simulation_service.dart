@@ -47,7 +47,12 @@ class BusSimulationService {
     ],
   ];
 
-  static const List<String> _busIds = ['BUS-001', 'BUS-002', 'BUS-003', 'BUS-004'];
+  static const List<String> _busIds = [
+    'BUS-001',
+    'BUS-002',
+    'BUS-003',
+    'BUS-004',
+  ];
   static const List<String> _routeNames = [
     'Route 4A - Kampala Loop',
     'Route 14 - Wandegeya → City Square',
@@ -77,8 +82,11 @@ class BusSimulationService {
         final start = route[_currentIndices[i]];
         final end = route[(_currentIndices[i] + 1) % route.length];
 
-        final lat = start.latitude + (end.latitude - start.latitude) * _progresses[i];
-        final lng = start.longitude + (end.longitude - start.longitude) * _progresses[i];
+        final lat =
+            start.latitude + (end.latitude - start.latitude) * _progresses[i];
+        final lng =
+            start.longitude +
+            (end.longitude - start.longitude) * _progresses[i];
 
         // Randomize speed, passengers, and seats per bus
         final speed = 15.0 + (_random.nextDouble() * 25);
@@ -86,17 +94,19 @@ class BusSimulationService {
         final passengerCount = 8 + _random.nextInt(28);
         final availableSeats = totalSeats - passengerCount;
 
-        buses.add(BusModel(
-          id: _busIds[i],
-          routeName: _routeNames[i % _routeNames.length],
-          position: LatLng(lat, lng),
-          speed: speed,
-          passengerCount: passengerCount,
-          availableSeats: availableSeats.clamp(0, totalSeats),
-          totalSeats: totalSeats,
-          status: 'active',
-          lastUpdated: DateTime.now(),
-        ));
+        buses.add(
+          BusModel(
+            id: _busIds[i],
+            routeName: _routeNames[i % _routeNames.length],
+            position: LatLng(lat, lng),
+            speed: speed,
+            passengerCount: passengerCount,
+            availableSeats: availableSeats.clamp(0, totalSeats),
+            totalSeats: totalSeats,
+            status: 'active',
+            lastUpdated: DateTime.now(),
+          ),
+        );
       }
 
       return buses;

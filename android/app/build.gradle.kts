@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -10,6 +12,7 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -23,8 +26,21 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use(localProperties::load)
+        }
+        val mapsProperties = Properties()
+        val mapsPropertiesFile = rootProject.file("maps_api_key.properties")
+        if (mapsPropertiesFile.exists()) {
+            mapsPropertiesFile.inputStream().use(mapsProperties::load)
+        }
         manifestPlaceholders["MAPS_API_KEY"] =
-            (project.findProperty("MAPS_API_KEY") as String?) ?: ""
+            (project.findProperty("MAPS_API_KEY") as String?)
+                ?: mapsProperties.getProperty("MAPS_API_KEY")
+                ?: localProperties.getProperty("MAPS_API_KEY")
+                ?: ""
     }
 
     buildTypes {
@@ -34,6 +50,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 kotlin {

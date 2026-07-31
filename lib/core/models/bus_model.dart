@@ -38,17 +38,24 @@ class BusModel {
   }
 
   factory BusModel.fromFirestore(String docId, Map<String, dynamic> data) {
-    final geo = data['location'] as GeoPoint;
+    final location = data['location'];
+    final latitude = location is GeoPoint
+        ? location.latitude
+        : (data['latitude'] as num?)?.toDouble() ?? 0;
+    final longitude = location is GeoPoint
+        ? location.longitude
+        : (data['longitude'] as num?)?.toDouble() ?? 0;
+    final updatedAt = data['updatedAt'] ?? data['lastUpdated'];
     return BusModel(
       id: docId,
       routeName: data['routeName'] ?? 'Unknown Route',
-      position: LatLng(geo.latitude, geo.longitude),
+      position: LatLng(latitude, longitude),
       speed: (data['speed'] ?? 0.0).toDouble(),
       passengerCount: data['passengerCount'] ?? 0,
       availableSeats: data['availableSeats'] ?? data['totalSeats'] ?? 0,
       totalSeats: data['totalSeats'] ?? 40,
       status: data['status'] ?? 'active',
-      lastUpdated: (data['lastUpdated'] as Timestamp).toDate(),
+      lastUpdated: updatedAt is Timestamp ? updatedAt.toDate() : DateTime.now(),
     );
   }
 }
