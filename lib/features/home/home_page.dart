@@ -4,18 +4,29 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+<<<<<<< HEAD
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+=======
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_map/flutter_map.dart' as osm;
+import 'package:latlong2/latlong.dart' as latlng;
+import 'package:smartrideug/core/theme/app_theme.dart';
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 import 'package:smartrideug/features/authentication/authentication_page.dart';
-import 'package:smartrideug/features/home/booking_status_page.dart';
 import 'package:smartrideug/features/home/destination_page.dart';
 import 'package:smartrideug/features/home/help_support_page.dart';
 import 'package:smartrideug/features/home/payment_method_page.dart';
 import 'package:smartrideug/features/home/saved_places_page.dart';
 import 'package:smartrideug/features/home/seat_reservations_page.dart';
 import 'package:smartrideug/features/home/settings_page.dart';
+import 'package:smartrideug/features/home/modern_home_content.dart';
+import 'package:smartrideug/features/map/live_map_screen.dart';
 import 'package:smartrideug/features/notifications/notifications_page.dart';
+<<<<<<< HEAD
 import 'package:smartrideug/core/theme/app_theme.dart';
+=======
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
 class HomePage extends StatefulWidget {
   final bool guestMode;
@@ -28,8 +39,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
 
+<<<<<<< HEAD
   final List<String> _pageTitles = [
     'Smart Ride',
     'My Bookings',
@@ -37,6 +50,9 @@ class _HomePageState extends State<HomePage> {
     'Notifications',
     'Profile',
   ];
+=======
+  static const _pageTitles = ['Smart Ride', 'Routes', 'Scan', 'Profile'];
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
   void _handleGuestAction(String feature) {
     if (!widget.guestMode) return;
@@ -68,20 +84,33 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppTheme.navy,
+        foregroundColor: Colors.white,
         elevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        leading: IconButton(
+          tooltip: 'Menu',
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
-        title: Text(
-          _selectedIndex == 0 ? 'Smart Ride' : _pageTitles[_selectedIndex],
-        ),
+        title: _selectedIndex == 0
+            ? RichText(
+                text: const TextSpan(
+                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800),
+                  children: [
+                    TextSpan(text: 'Smart'),
+                    TextSpan(
+                      text: 'Ride',
+                      style: TextStyle(color: AppTheme.orange),
+                    ),
+                  ],
+                ),
+              )
+            : Text(_pageTitles[_selectedIndex]),
         actions: [
           IconButton(
+<<<<<<< HEAD
             icon: const Icon(Icons.notifications_none),
             onPressed: () {
               if (widget.guestMode) {
@@ -92,6 +121,13 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (_) => const NotificationsPage()),
               );
             },
+=======
+            tooltip: 'Notifications',
+            icon: const Icon(Icons.notifications_none_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationsPage()),
+            ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
           ),
         ],
       ),
@@ -100,6 +136,7 @@ class _HomePageState extends State<HomePage> {
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(color: AppTheme.navy),
               accountName: Text(
                 widget.guestMode
                     ? 'Guest User'
@@ -118,9 +155,16 @@ class _HomePageState extends State<HomePage> {
                     : FirebaseAuth.instance.currentUser?.photoURL != null
                     ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
                     : null,
+<<<<<<< HEAD
                 child: widget.guestMode
                     ? const Icon(Icons.person_outline, size: 36)
                     : const Icon(Icons.person, size: 36),
+=======
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
               ),
             ),
             ListTile(
@@ -254,6 +298,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+<<<<<<< HEAD
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
@@ -300,9 +345,162 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications),
             label: 'Notifications',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+=======
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          const ModernHomeContent(),
+          const LiveMapScreen(),
+          const _ScanTab(),
+          const ProfileTab(),
         ],
+      ),
+      bottomNavigationBar: _ResponsiveBottomNavigation(
+        selectedIndex: _selectedIndex,
+        onSelected: (index) => setState(() => _selectedIndex = index),
+      ),
+    );
+  }
+}
+
+class _ResponsiveBottomNavigation extends StatelessWidget {
+  const _ResponsiveBottomNavigation({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  static const _items = [
+    (
+      label: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+    ),
+    (
+      label: 'Routes',
+      icon: Icons.directions_bus_outlined,
+      selectedIcon: Icons.directions_bus_rounded,
+    ),
+    (
+      label: 'Scan',
+      icon: Icons.qr_code_scanner,
+      selectedIcon: Icons.qr_code_scanner,
+    ),
+    (
+      label: 'Profile',
+      icon: Icons.person_outline,
+      selectedIcon: Icons.person_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final height = isLandscape ? 58.0 : 68.0;
+
+    return SafeArea(
+      top: false,
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: SizedBox(
+          height: height,
+          child: Row(
+            children: List.generate(
+              _items.length,
+              (index) => _ResponsiveNavigationItem(
+                label: _items[index].label,
+                icon: _items[index].icon,
+                selectedIcon: _items[index].selectedIcon,
+                selected: index == selectedIndex,
+                compact: isLandscape,
+                onTap: () => onSelected(index),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResponsiveNavigationItem extends StatelessWidget {
+  const _ResponsiveNavigationItem({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppTheme.orange : AppTheme.navy;
+    final iconSize = compact ? 22.0 : 24.0;
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 3 : 5),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  width: compact ? 36 : 42,
+                  height: compact ? 28 : 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFFFFEDD5)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    selected ? selectedIcon : icon,
+                    color: color,
+                    size: iconSize,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: GoogleFonts.poppins(
+                        color: color,
+                        fontSize: compact ? 10 : 11,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
+          ),
+        ),
       ),
     );
   }
@@ -366,6 +564,38 @@ class _HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<_HomeContent> {
+<<<<<<< HEAD
+=======
+  final bool _hasActiveRide = false;
+
+  List<osm.Marker> _markersFrom(QuerySnapshot<Map<String, dynamic>> snapshot) =>
+      snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final lat = (data['latitude'] as num?)?.toDouble();
+            final lng = (data['longitude'] as num?)?.toDouble();
+            if (lat == null || lng == null) return null;
+            return osm.Marker(
+              point: latlng.LatLng(lat, lng),
+              width: 38,
+              height: 38,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppTheme.orange,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.directions_bus,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            );
+          })
+          .whereType<osm.Marker>()
+          .toList();
+
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -381,6 +611,7 @@ class _HomeContentState extends State<_HomeContent> {
         : user?.email ?? 'Your area';
 
     return Container(
+<<<<<<< HEAD
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -400,6 +631,295 @@ class _HomeContentState extends State<_HomeContent> {
             // Header Section
             Container(
               padding: const EdgeInsets.fromLTRB(0, 16, 0, 16),
+=======
+      color: AppTheme.grey50,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // Header Section with Gradient Background
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Greeting and Bell Icon Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          text: 'Good afternoon, ',
+                          style: TextStyle(
+                            color: AppTheme.grey500,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: userName,
+                              style: TextStyle(
+                                color: AppTheme.grey500,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const TextSpan(text: ' 👋'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.notifications_active,
+                        color: AppTheme.orange,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Where are you going today?',
+                  style: TextStyle(
+                    color: AppTheme.grey900,
+                    fontSize: 32,
+                    height: 1.12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Search Bar with Filter
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.search,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                decoration: InputDecoration(
+                                  hintText: 'Search destination...',
+                                  hintStyle: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                  border: InputBorder.none,
+                                ),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const DestinationPage(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.orange,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.all(10),
+                      child: Icon(Icons.tune, color: Colors.white, size: 22),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Current Location Section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppTheme.white,
+                border: Border.all(color: AppTheme.grey100),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.orangeSoft,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.location_on,
+                      color: AppTheme.orange,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Current Location',
+                          style: TextStyle(
+                            color: AppTheme.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          userLocation,
+                          style: TextStyle(
+                            color: AppTheme.navy,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppTheme.grey300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'View on Map',
+                      style: TextStyle(
+                        color: AppTheme.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Nearby Buses Section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.25),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onPrimary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.directions_bus,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Nearby Buses',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '5 buses near you',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary.withValues(alpha: 0.85),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'View All',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.12),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surface.withValues(alpha: 0.25),
+                ),
+              ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -775,10 +1295,46 @@ class _HomeContentState extends State<_HomeContent> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: SizedBox(
+<<<<<<< HEAD
                     height: 160,
                     child: GestureDetector(
                       onTap: () => Navigator.of(context).pushNamed('/live-map'),
                       child: AbsorbPointer(child: _HomeMiniMap()),
+=======
+                    height: 260,
+                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('busLocations')
+                          .where(
+                            'status',
+                            whereIn: [
+                              'online',
+                              'moving',
+                              'approaching_stop',
+                              'stopped',
+                            ],
+                          )
+                          .snapshots(),
+                      builder: (context, snapshot) => osm.FlutterMap(
+                        options: const osm.MapOptions(
+                          initialCenter: latlng.LatLng(0.3476, 32.5825),
+                          initialZoom: 13,
+                        ),
+                        children: [
+                          osm.TileLayer(
+                            urlTemplate:
+                                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            subdomains: const ['a', 'b', 'c'],
+                            userAgentPackageName: 'com.mhl.smartrideug',
+                          ),
+                          osm.MarkerLayer(
+                            markers: snapshot.hasData
+                                ? _markersFrom(snapshot.data!)
+                                : const [],
+                          ),
+                        ],
+                      ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                     ),
                   ),
                 ),
@@ -1068,6 +1624,7 @@ class _HomeContentState extends State<_HomeContent> {
                       child: _ToolCard(
                         icon: Icons.book,
                         title: 'Bookings',
+<<<<<<< HEAD
                         subtitle: widget.guestMode
                             ? 'Sign up to book'
                             : 'View all your\nbookings',
@@ -1083,6 +1640,14 @@ class _HomeContentState extends State<_HomeContent> {
                           );
                         },
                         guestMode: widget.guestMode,
+=======
+                        subtitle: 'View all your\nbookings',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SeatReservationsPage(),
+                          ),
+                        ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1407,6 +1972,7 @@ class _BookingsTab extends StatelessWidget {
           style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 20),
+<<<<<<< HEAD
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
               .collection('bookings')
@@ -1463,6 +2029,27 @@ class _BookingsTab extends StatelessWidget {
               }).toList(),
             );
           },
+=======
+        _StatusCard(
+          title: 'Pending ride',
+          subtitle: 'BUS 101 • Makerere → Ntinda',
+          status: 'Waiting for confirmation',
+          icon: Icons.hourglass_top,
+        ),
+        const SizedBox(height: 16),
+        _StatusCard(
+          title: 'Confirmed ride',
+          subtitle: 'BUS 215 • City Centre → Entebbe',
+          status: 'Reserved seat 16',
+          icon: Icons.event_seat,
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SeatReservationsPage()),
+          ),
+          child: const Text('Open booking details'),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
       ],
     );

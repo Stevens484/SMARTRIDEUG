@@ -143,6 +143,7 @@ class BusPopupWidget extends StatelessWidget {
               onPressed: () {
                 Navigator.pop(context);
                 // 🔥 FIX: Pass all required data to the route
+<<<<<<< HEAD
                 Navigator.pushNamed(
                   context,
                   '/confirm-seat',
@@ -153,6 +154,14 @@ class BusPopupWidget extends StatelessWidget {
                     'farePerSeat': 3000,
                     'seats': ['1A'], // Default seat selection
                   },
+=======
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Open the assigned route to choose the live bus and its actual seats.',
+                    ),
+                  ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                 );
               },
               child: const Row(

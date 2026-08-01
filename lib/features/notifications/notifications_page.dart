@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+<<<<<<< HEAD
 import 'package:firebase_auth/firebase_auth.dart';
+=======
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 import 'package:flutter/material.dart';
 
 class NotificationsPage extends StatelessWidget {
@@ -8,6 +11,7 @@ class NotificationsPage extends StatelessWidget {
   static const routeName = '/notifications';
 
   @override
+<<<<<<< HEAD
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
@@ -73,10 +77,66 @@ class NotificationsPage extends StatelessWidget {
                   },
                 );
               },
+=======
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Notifications')),
+    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('notifications')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Center(child: Text('Notifications are unavailable.'));
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final notifications = snapshot.data!.docs.where((document) {
+          final audience = document.data()['audience']?.toString();
+          return audience == null ||
+              audience == 'all' ||
+              audience == 'passengers';
+        }).toList()..sort((a, b) => _date(b.data()).compareTo(_date(a.data())));
+        if (notifications.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('No announcements yet.'),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: notifications.length,
+          separatorBuilder: (_, _) => const Divider(),
+          itemBuilder: (context, index) {
+            final data = notifications[index].data();
+            final createdAt = _date(data);
+            return ListTile(
+              leading: Icon(
+                data['type']?.toString() == 'promotion'
+                    ? Icons.local_offer_outlined
+                    : Icons.notifications_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(data['title']?.toString() ?? 'SmartRide update'),
+              subtitle: Text(data['body']?.toString() ?? ''),
+              trailing: Text(
+                '${createdAt.day}/${createdAt.month}',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
             );
           },
-        ),
-      ),
-    );
+        );
+      },
+    ),
+  );
+
+  static DateTime _date(Map<String, dynamic> data) {
+    final value = data['publishedAt'] ?? data['createdAt'];
+    return value is Timestamp
+        ? value.toDate()
+        : DateTime.fromMillisecondsSinceEpoch(0);
   }
 }

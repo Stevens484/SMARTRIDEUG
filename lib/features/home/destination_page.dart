@@ -2,6 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smartrideug/features/home/route_details_page.dart';
 
+<<<<<<< HEAD
+=======
+/// Finds active routes by destination and combines them with the live vehicle
+/// feed. Both streams stay open, so the matching route and its buses update
+/// without the passenger searching again.
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 class DestinationPage extends StatefulWidget {
   const DestinationPage({super.key});
 
@@ -10,6 +16,7 @@ class DestinationPage extends StatefulWidget {
   @override
   State<DestinationPage> createState() => _DestinationPageState();
 }
+<<<<<<< HEAD
 
 class _DestinationPageState extends State<DestinationPage> {
   String _searchQuery = '';
@@ -213,31 +220,182 @@ class _DestinationPageState extends State<DestinationPage> {
               ),
             ],
           ),
+=======
+
+class _DestinationPageState extends State<DestinationPage> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Choose destination'), elevation: 0),
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _search,
+              autofocus: true,
+              onChanged: (value) =>
+                  setState(() => _query = value.trim().toLowerCase()),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          _search.clear();
+                          setState(() => _query = '');
+                        },
+                      ),
+                hintText: 'Type a destination, e.g. Ntinda',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('routes')
+                    .where('active', isEqualTo: true)
+                    .snapshots(),
+                builder: (context, routeSnapshot) {
+                  if (routeSnapshot.hasError) {
+                    return _message('Routes could not be loaded.');
+                  }
+                  if (!routeSnapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final matchingRoutes = routeSnapshot.data!.docs
+                      .where((route) => _matchesDestination(route.data()))
+                      .toList();
+                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('busLocations')
+                        .where(
+                          'status',
+                          whereIn: const [
+                            'online',
+                            'moving',
+                            'approaching_stop',
+                            'active',
+                            'on_route',
+                          ],
+                        )
+                        .snapshots(),
+                    builder: (context, busSnapshot) {
+                      if (busSnapshot.hasError) {
+                        return _message('Live buses could not be loaded.');
+                      }
+                      final buses = busSnapshot.data?.docs ?? const [];
+                      if (matchingRoutes.isEmpty) {
+                        return _message(
+                          _query.isEmpty
+                              ? 'No active routes are available at the moment.'
+                              : 'No active route goes to “${_search.text.trim()}”.',
+                        );
+                      }
+                      return ListView(
+                        children: [
+                          Text(
+                            _query.isEmpty
+                                ? 'Available routes'
+                                : 'Routes to ${_search.text.trim()}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          ...matchingRoutes.map(
+                            (route) => _RouteCard(
+                              route: route,
+                              buses: buses
+                                  .where(
+                                    (bus) =>
+                                        bus.data()['routeId']?.toString() ==
+                                        route.id,
+                                  )
+                                  .toList(),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      RouteDetailsPage(routeId: route.id),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.sync_rounded,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text(
+                                      'Routes and buses update automatically as drivers go online or move.',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
       ),
-    );
+    ),
+  );
+
+  bool _matchesDestination(Map<String, dynamic> route) {
+    if (_query.isEmpty) return true;
+    final destination = route['destination']?.toString().toLowerCase() ?? '';
+    // Destination is intentionally the primary match: typing a place leaves
+    // only routes that go there, rather than unrelated routes that merely pass it.
+    return destination.contains(_query);
   }
+
+  Widget _message(String message) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Text(message, textAlign: TextAlign.center),
+    ),
+  );
 }
 
 class _RouteCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String distance;
-  final String duration;
-  final int busesAvailable;
-  final VoidCallback onTap;
-
   const _RouteCard({
-    required this.title,
-    required this.subtitle,
-    required this.distance,
-    required this.duration,
-    required this.busesAvailable,
+    required this.route,
+    required this.buses,
     required this.onTap,
   });
 
+  final QueryDocumentSnapshot<Map<String, dynamic>> route;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> buses;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -247,11 +405,25 @@ class _RouteCard extends StatelessWidget {
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(vertical: 8),
+=======
+    final data = route.data();
+    final destination =
+        data['destination']?.toString() ?? 'Destination unavailable';
+    final origin = data['origin']?.toString() ?? 'Origin unavailable';
+    final title = data['name']?.toString() ?? '$origin → $destination';
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
+          padding: const EdgeInsets.all(16),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+<<<<<<< HEAD
               Container(
                 width: 48,
                 height: 48,
@@ -342,11 +514,79 @@ class _RouteCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+=======
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: scheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.route_rounded, color: scheme.secondary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$origin → $destination',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                 ],
               ),
+              const SizedBox(height: 14),
+              Text(
+                buses.isEmpty
+                    ? 'No buses are online on this route yet'
+                    : '${buses.length} live ${buses.length == 1 ? 'bus' : 'buses'} on this route',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (buses.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: buses
+                      .map((bus) => _LiveBusChip(bus: bus.data()))
+                      .toList(),
+                ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LiveBusChip extends StatelessWidget {
+  const _LiveBusChip({required this.bus});
+  final Map<String, dynamic> bus;
+
+  @override
+  Widget build(BuildContext context) {
+    final identifier = bus['plateNumber']?.toString().isNotEmpty == true
+        ? bus['plateNumber'].toString()
+        : bus['busNumber']?.toString() ?? 'Bus';
+    final seats = bus['availableSeats'] as num?;
+    final status = bus['status']?.toString() ?? 'online';
+    return Chip(
+      avatar: const Icon(Icons.directions_bus_rounded, size: 18),
+      label: Text(
+        '$identifier • ${seats == null ? 'seats updating' : '${seats.toInt()} seats'} • $status',
       ),
     );
   }

@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import 'package:smartrideug/core/services/authentication_service.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/authentication/authentication_page.dart';
+=======
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smartrideug/core/services/authentication_service.dart';
+import 'package:smartrideug/features/authentication/authentication_page.dart';
+import 'package:smartrideug/features/admin/admin_dashboard_page.dart';
+import 'package:smartrideug/features/driver/driver_dashboard_page.dart';
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 import 'package:smartrideug/features/home/home_page.dart';
 
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
   static const routeName = '/';
+<<<<<<< HEAD
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -244,9 +253,218 @@ class SplashPage extends StatelessWidget {
 
                 const SizedBox(height: 30),
               ],
+=======
+  @override
+  State<SplashPage> createState() => _SplashPageState();
+}
+
+class _SplashPageState extends State<SplashPage> {
+  int _taps = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreSession());
+  }
+
+  Future<void> _restoreSession() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final String role;
+    try {
+      role = await AuthenticationService().roleForUser(user);
+    } catch (_) {
+      // Do not assume passenger when an operator's role cannot be verified.
+      // That would open the wrong workspace for an admin or driver.
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'We could not verify your account role. Please sign in again.',
             ),
           ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => _dashboardFor(role)));
+  }
+
+  Widget _dashboardFor(String role) => switch (role) {
+    'admin' => const AdminDashboardPage(),
+    'driver' => const DriverDashboardPage(),
+    _ => const HomePage(),
+  };
+
+  void _tap() {
+    setState(() => _taps++);
+    if (_taps == 5) _showOperators();
+  }
+
+  void _showOperators() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Operator access',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('Choose your operational workspace.'),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings),
+                title: const Text('Admin dashboard'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AuthenticationPage(
+                        register: false,
+                        operator: true,
+                        role: 'admin',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.drive_eta),
+                title: const Text('Driver dashboard'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AuthenticationPage(
+                        register: false,
+                        operator: true,
+                        role: 'driver',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: InkWell(
+      onTap: _tap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/images/landing.png',
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x4D0F2345), Color(0xB30F2345)],
+              ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
+            ),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isLandscape =
+                    MediaQuery.orientationOf(context) == Orientation.landscape;
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
+                        Align(
+                          child: FractionallySizedBox(
+                            widthFactor: isLandscape ? .48 : .88,
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: .94),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Image.asset(
+                                'assets/images/smartride_wordmark.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AuthenticationPage(
+                                        register: true,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text('Get started'),
+                                ),
+                                const SizedBox(height: 12),
+                                OutlinedButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const AuthenticationPage(),
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(
+                                      color: Colors.white70,
+                                    ),
+                                    backgroundColor: Colors.white.withValues(
+                                      alpha: .08,
+                                    ),
+                                  ),
+                                  child: const Text('Login'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     ),
   ],

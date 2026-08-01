@@ -3,18 +3,29 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+=======
+import 'package:smartrideug/core/services/driver_live_location_service.dart';
+import 'package:smartrideug/core/theme/app_theme.dart';
+import 'package:smartrideug/core/theme/theme_notifier.dart';
+import 'package:smartrideug/features/authentication/authentication_page.dart';
+import 'package:smartrideug/features/map/driver_trip_map_panel.dart';
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
 class DriverDashboardPage extends StatefulWidget {
   const DriverDashboardPage({super.key});
+
   @override
   State<DriverDashboardPage> createState() => _DriverDashboardPageState();
 }
 
 class _DriverDashboardPageState extends State<DriverDashboardPage> {
+  final _location = DriverLiveLocationService();
   bool _online = false;
+<<<<<<< HEAD
   bool _starting = false;
   DateTime? _lastUpdate;
   StreamSubscription<Position>? _positionSub;
@@ -147,6 +158,61 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+=======
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _location.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle(String busId, String routeId, String driverId) async {
+    setState(() => _saving = true);
+    try {
+      if (_online) {
+        await _location.stop(busId);
+      } else {
+        await _location.start(
+          busId: busId,
+          routeId: routeId,
+          driverId: driverId,
+        );
+      }
+      await FirebaseFirestore.instance.collection('busStatus').doc(busId).set({
+        'status': _online ? 'offline' : 'online',
+        'routeId': routeId,
+        'driverId': driverId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (mounted) setState(() => _online = !_online);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _logout([String? assignedBusId]) async {
+    final busId = assignedBusId?.trim() ?? '';
+    if (_online && busId.isNotEmpty) {
+      try {
+        await _location.stop(busId);
+      } catch (_) {
+        // Logging out should remain possible if location shutdown is unavailable.
+      }
+    }
+    await FirebaseAuth.instance.signOut();
+    if (mounted) {
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AuthenticationPage.routeName, (_) => false);
+    }
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   }
 
   @override
@@ -155,6 +221,7 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       title: const Text('Driver dashboard'),
       actions: [
         IconButton(
+<<<<<<< HEAD
           icon: const Icon(Icons.logout),
           tooltip: 'Log out',
           onPressed: _logout,
@@ -277,8 +344,259 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                   .toList(),
             );
           },
+=======
+          tooltip: Theme.of(context).brightness == Brightness.dark
+              ? 'Use light mode'
+              : 'Use dark mode',
+          icon: Icon(
+            Theme.of(context).brightness == Brightness.dark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
+          ),
+          onPressed: () => themeNotifier.toggleTheme(
+            Theme.of(context).brightness != Brightness.dark,
+          ),
+        ),
+        IconButton(
+          tooltip: 'Logout',
+          icon: const Icon(Icons.logout),
+          onPressed: _logout,
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
       ],
+    ),
+    body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(FirebaseAuth.instance.currentUser?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final assignment = snapshot.data?.data();
+        final busId = (assignment?['assignedBusId'] ?? assignment?['busId'])
+            ?.toString()
+            .trim();
+        final routeId =
+            (assignment?['assignedRouteId'] ?? assignment?['routeId'])
+                ?.toString()
+                .trim();
+        if (busId == null ||
+            busId.isEmpty ||
+            routeId == null ||
+            routeId.isEmpty) {
+          return const _AssignmentPendingCard();
+        }
+        final driverId = FirebaseAuth.instance.currentUser?.uid;
+        if (driverId == null) return const _AssignmentPendingCard();
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+          children: [
+            Text('Active trip', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('buses')
+                      .doc(busId)
+                      .snapshots(),
+                  builder: (context, busSnapshot) =>
+                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('routes')
+                            .doc(routeId)
+                            .snapshots(),
+                        builder: (context, routeSnapshot) {
+                          final bus = busSnapshot.data?.data();
+                          final route = routeSnapshot.data?.data();
+                          final plate =
+                              bus?['plateNumber']
+                                      ?.toString()
+                                      .trim()
+                                      .isNotEmpty ==
+                                  true
+                              ? bus!['plateNumber'].toString()
+                              : bus?['plate']?.toString().trim().isNotEmpty ==
+                                    true
+                              ? bus!['plate'].toString()
+                              : bus?['busNumber']?.toString() ??
+                                    'Bus unavailable';
+                          final routeName =
+                              route?['name']?.toString() ?? 'Route unavailable';
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Assigned bus: $plate'),
+                              const SizedBox(height: 4),
+                              Text('Assigned route: $routeName'),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _toggle(busId, routeId, driverId),
+                                  icon: Icon(
+                                    _online
+                                        ? Icons.stop_circle_outlined
+                                        : Icons.play_circle_outline,
+                                  ),
+                                  label: Text(
+                                    _online
+                                        ? 'End active trip'
+                                        : 'Start active trip',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (_online)
+              _activeTrip(busId, routeId)
+            else
+              const _InactiveTripCard(),
+          ],
+        );
+      },
+    ),
+  );
+
+  Widget _activeTrip(String busId, String routeId) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('routes')
+          .doc(routeId)
+          .snapshots(),
+      builder: (context, routeSnapshot) {
+        final route = routeSnapshot.data?.data();
+        if (route == null) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text(
+                'Waiting for the assigned route to become available.',
+              ),
+            ),
+          );
+        }
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('busLocations')
+              .doc(busId)
+              .snapshots(),
+          builder: (context, busSnapshot) =>
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('bookings')
+                    .where('busId', isEqualTo: busId)
+                    .snapshots(),
+                builder: (context, bookingSnapshot) {
+                  final bookings = bookingSnapshot.data?.docs ?? const [];
+                  final activeCount = bookings.where((booking) {
+                    const statuses = {'confirmed', 'active', 'boarding'};
+                    return statuses.contains(
+                      booking.data()['status']?.toString().toLowerCase(),
+                    );
+                  }).length;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.navigation_rounded,
+                            color: AppTheme.orange,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$activeCount passengers awaiting pickup',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: SizedBox(
+                          height: 410,
+                          child: DriverTripMapPanel(
+                            routeId: routeId,
+                            route: route,
+                            bus: busSnapshot.data?.data(),
+                            bookings: bookings,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Passenger pins show confirmed, active, and boarding requests only. Tap one for pickup details.',
+                        style: TextStyle(color: AppTheme.grey500),
+                      ),
+                    ],
+                  );
+                },
+              ),
+        );
+      },
+    );
+  }
+}
+
+class _InactiveTripCard extends StatelessWidget {
+  const _InactiveTripCard();
+
+  @override
+  Widget build(BuildContext context) => const Card(
+    child: Padding(
+      padding: EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Icon(Icons.gps_off_rounded, color: AppTheme.grey500),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Start your trip to share bus location and view active passenger pickups.',
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AssignmentPendingCard extends StatelessWidget {
+  const _AssignmentPendingCard();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Card(
+        child: const Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.assignment_late_outlined, size: 42),
+              SizedBox(height: 12),
+              Text(
+                'You have not been assigned a bus and route yet.',
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Please contact an administrator.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }

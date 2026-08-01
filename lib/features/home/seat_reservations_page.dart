@@ -8,18 +8,19 @@ class SeatReservationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid;
-
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Seat Reservations')),
+        appBar: AppBar(title: const Text('Seat reservations')),
         body: const Center(child: Text('Sign in to view your reservations.')),
       );
     }
-
     return Scaffold(
+<<<<<<< HEAD
       appBar: AppBar(title: const Text('Seat Reservations'), elevation: 0),
+=======
+      appBar: AppBar(title: const Text('Seat reservations')),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('bookings')
@@ -31,6 +32,7 @@ class SeatReservationsPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+<<<<<<< HEAD
 
           if (snapshot.hasError) {
             return Center(
@@ -63,11 +65,18 @@ class SeatReservationsPage extends StatelessWidget {
           }
 
           final reservations = snapshot.data!.docs;
+=======
+          final reservations = snapshot.data!.docs;
+          if (reservations.isEmpty) {
+            return const Center(child: Text('No seat reservations found.'));
+          }
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
           return ListView.separated(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             itemCount: reservations.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
+<<<<<<< HEAD
               final data = reservations[index].data();
               final docId = reservations[index].id;
               final route = data['routeName']?.toString() ?? 'Unknown route';
@@ -148,6 +157,53 @@ class SeatReservationsPage extends StatelessWidget {
                             color: Colors.grey[500],
                             fontSize: 12,
                           ),
+=======
+              final reservation = reservations[index].data();
+              final routeName = reservation['routeName']?.toString();
+              final route = routeName?.isNotEmpty == true
+                  ? routeName!
+                  : '${reservation['origin'] ?? ''} → ${reservation['destination'] ?? ''}';
+              final plate = reservation['plateNumber']?.toString();
+              final bus = plate?.isNotEmpty == true
+                  ? plate!
+                  : reservation['busNumber']?.toString() ?? 'Bus unavailable';
+              final seats =
+                  (reservation['seats'] as Iterable?)?.join(', ') ??
+                  'Seats unavailable';
+              final status =
+                  reservation['status']?.toString().toLowerCase() ?? 'unknown';
+              final color = switch (status) {
+                'confirmed' => Colors.green,
+                'held' => Colors.orange,
+                'cancelled' => Colors.red,
+                _ => Theme.of(context).colorScheme.onSurfaceVariant,
+              };
+              return Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          BookingStatusPage(bookingId: reservations[index].id),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          route.trim().isEmpty ? 'Route unavailable' : route,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Bus $bus • Seat(s) $seats'),
+                        const SizedBox(height: 8),
+                        Chip(
+                          label: Text(status.toUpperCase()),
+                          backgroundColor: color,
+                          labelStyle: const TextStyle(color: Colors.white),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                         ),
                       ],
                     ),

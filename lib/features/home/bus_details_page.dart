@@ -1,20 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import 'package:flutter_map/flutter_map.dart'; // 🔥 REPLACES google_maps_flutter
 import 'package:latlong2/latlong.dart'; // 🔥 FOR MAP COORDINATES
+=======
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/home/seat_layout_page.dart';
+import 'package:smartrideug/features/map/route_map_panel.dart';
 
 class BusDetailsPage extends StatelessWidget {
   final String busId;
   final String routeId;
   final String number;
+  final String? routeId;
 
   const BusDetailsPage({
     super.key,
     required this.busId,
+<<<<<<< HEAD
     required this.routeId,
     required this.number,
+=======
+    required this.number,
+    this.routeId,
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   });
 
   @override
@@ -22,6 +32,77 @@ class BusDetailsPage extends StatelessWidget {
     final isWide =
         MediaQuery.of(context).size.width >= 720 ||
         MediaQuery.of(context).orientation == Orientation.landscape;
+
+    Widget assignedRoute(Map<String, dynamic> busData) {
+      final assignedRouteId =
+          busData['routeId']?.toString() ??
+          busData['currentRoute']?.toString() ??
+          routeId;
+      if (assignedRouteId == null || assignedRouteId.isEmpty) {
+        return const Text('No route assigned yet.');
+      }
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('routes')
+            .doc(assignedRouteId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          final route = snapshot.data?.data();
+          if (route == null) {
+            return Text(
+              busData['routeName']?.toString() ?? 'Assigned route unavailable',
+            );
+          }
+          final routeName = route['name']?.toString() ?? 'Assigned route';
+          final origin = route['origin']?.toString() ?? 'Unknown origin';
+          final destination =
+              route['destination']?.toString() ?? 'Unknown destination';
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                routeName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 3),
+              Text('$origin → $destination'),
+            ],
+          );
+        },
+      );
+    }
+
+    Widget driverDetails(Map<String, dynamic> busData) {
+      final driverId = busData['driverId']?.toString();
+      if (driverId == null || driverId.isEmpty) {
+        return const Text('No driver is assigned to this bus yet.');
+      }
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(driverId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          final driver = snapshot.data?.data();
+          if (driver == null) return const Text('Driver profile unavailable.');
+          final name =
+              driver['displayName']?.toString() ??
+              driver['name']?.toString() ??
+              'Assigned driver';
+          final email = driver['email']?.toString();
+          final employeeId = driver['employeeId']?.toString();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              if (email != null && email.isNotEmpty) Text(email),
+              if (employeeId != null && employeeId.isNotEmpty)
+                Text('Driver ID: $employeeId'),
+            ],
+          );
+        },
+      );
+    }
 
     Widget detailsColumn(Map<String, dynamic> busData) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +134,7 @@ class BusDetailsPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'BUS $number',
+                        'BUS ${busData['busNumber']?.toString() ?? number}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -61,7 +142,9 @@ class BusDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        busData['plate']?.toString() ?? 'Plate not available',
+                        (busData['plateNumber'] ?? busData['plate'])
+                                ?.toString() ??
+                            'Plate not available',
                         style: const TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
@@ -97,20 +180,14 @@ class BusDetailsPage extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  busData['routeName']?.toString() ??
-                      'Route details not available',
-                ),
+                assignedRoute(busData),
                 const SizedBox(height: 12),
                 const Text(
                   'Driver',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  busData['driverName']?.toString() ??
-                      'Driver details not available',
-                ),
+                driverDetails(busData),
                 const SizedBox(height: 12),
                 const Text(
                   'Pickup',
@@ -130,12 +207,30 @@ class BusDetailsPage extends StatelessWidget {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: () {
+              final assignedRouteId =
+                  busData['routeId']?.toString() ??
+                  busData['currentRoute']?.toString() ??
+                  routeId;
+              if (assignedRouteId == null || assignedRouteId.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('This bus has no route assignment yet.'),
+                  ),
+                );
+                return;
+              }
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => SeatLayoutPage(
                     busId: busId,
+<<<<<<< HEAD
                     routeId: routeId,
                     busNumber: number,
+=======
+                    busNumber: busData['busNumber']?.toString() ?? number,
+                    routeId: assignedRouteId,
+                    totalSeats: (busData['totalSeats'] as num?)?.toInt() ?? 1,
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                   ),
                 ),
               );
@@ -148,6 +243,7 @@ class BusDetailsPage extends StatelessWidget {
 
     // 🔥 NEW: Map preview using FlutterMap (free, no API keys)
     Widget mapPreview(Map<String, dynamic> busData) {
+<<<<<<< HEAD
       // Get pickup location from bus data, with fallback
       final pickupLat = (busData['latitude'] as num?)?.toDouble() ?? 0.3392;
       final pickupLng = (busData['longitude'] as num?)?.toDouble() ?? 32.5736;
@@ -242,31 +338,113 @@ class BusDetailsPage extends StatelessWidget {
             ],
           ),
         ),
+=======
+      final activeRouteId =
+          busData['routeId']?.toString() ?? busData['currentRoute']?.toString();
+      final resolvedRouteId = activeRouteId ?? routeId;
+      if (resolvedRouteId == null || resolvedRouteId.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('routes')
+            .doc(resolvedRouteId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          final route = snapshot.data?.data();
+          if (route == null) return const SizedBox.shrink();
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: RouteMapPanel(
+              routeId: resolvedRouteId,
+              route: route,
+              currentBus: busData,
+            ),
+          );
+        },
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text('Bus $number'), elevation: 0),
-      body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      appBar: AppBar(
+        elevation: 0,
+        title: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
-              .collection('busLocations')
+              .collection('buses')
               .doc(busId)
               .snapshots(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
+            final busNumber = snapshot.data?.data()?['busNumber']?.toString();
+            return Text(
+              'Bus ${busNumber?.isNotEmpty == true ? busNumber : number}',
+            );
+          },
+        ),
+      ),
+      body: SafeArea(
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('buses')
+              .doc(busId)
+              .snapshots(),
+          builder: (context, busSnapshot) {
+            if (!busSnapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final busData = snapshot.data!.data() ?? <String, dynamic>{};
-            return isWide
-                ? Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(16.0),
-                          child: detailsColumn(busData),
+            final savedBus = busSnapshot.data!.data() ?? <String, dynamic>{};
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('busLocations')
+                  .doc(busId)
+                  .snapshots(),
+              builder: (context, locationSnapshot) {
+                final busData = <String, dynamic>{
+                  ...savedBus,
+                  ...?locationSnapshot.data?.data(),
+                };
+                final busNumber = busData['busNumber']?.toString() ?? number;
+                return isWide
+                    ? Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(16.0),
+                              child: detailsColumn({
+                                ...busData,
+                                'busNumber': busNumber,
+                              }),
+                            ),
+                          ),
+                          if ((busData['routeId'] ??
+                                  busData['currentRoute'] ??
+                                  routeId) !=
+                              null)
+                            Expanded(
+                              flex: 2,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: mapPreview(busData),
+                              ),
+                            ),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            detailsColumn({...busData, 'busNumber': busNumber}),
+                            if ((busData['routeId'] ??
+                                    busData['currentRoute'] ??
+                                    routeId) !=
+                                null) ...[
+                              const SizedBox(height: 16),
+                              SizedBox(height: 240, child: mapPreview(busData)),
+                            ],
+                          ],
                         ),
+<<<<<<< HEAD
                       ),
                       Expanded(
                         flex: 2,
@@ -287,6 +465,11 @@ class BusDetailsPage extends StatelessWidget {
                       ],
                     ),
                   );
+=======
+                      );
+              },
+            );
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
           },
         ),
       ),
