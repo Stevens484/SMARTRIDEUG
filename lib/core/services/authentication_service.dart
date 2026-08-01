@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,7 +12,24 @@ class AuthenticationService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
 
+  static const _requestTimeout = Duration(seconds: 20);
+
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  /// Returns the workspace assigned to the signed-in account. Accounts with
+  /// no recognised role are passengers by default.
+  Future<String> roleForUser(User user) async {
+    final data = (await _withTimeout(
+      _db.collection('users').doc(user.uid).get(),
+      'Checking your account',
+    )).data();
+    final role = data?['role']?.toString().trim().toLowerCase();
+    return switch (role) {
+      'admin' => 'admin',
+      'driver' => 'driver',
+      _ => 'passenger',
+    };
+  }
 
   Future<UserCredential> signInAnonymously() {
     return _auth.signInAnonymously();
@@ -21,16 +40,16 @@ class AuthenticationService {
     String password, {
     String? role,
   }) async {
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
+    final credential = await _withTimeout(
+      _auth.signInWithEmailAndPassword(email: email.trim(), password: password),
+      'Signing in',
     );
 
     if (role != null && role != 'passenger') {
-      final userDoc = await _db
-          .collection('users')
-          .doc(credential.user!.uid)
-          .get();
+      final userDoc = await _withTimeout(
+        _db.collection('users').doc(credential.user!.uid).get(),
+        'Checking operator access',
+      );
       final data = userDoc.data();
       if (data == null || data['role'] != role) {
         await _auth.signOut();
@@ -45,6 +64,7 @@ class AuthenticationService {
     required String email,
     required String password,
   }) async {
+<<<<<<< HEAD
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -56,6 +76,50 @@ class AuthenticationService {
       'employeeId': '',
       'createdAt': FieldValue.serverTimestamp(),
     });
+=======
+    if (role != 'passenger') {
+      final invite = await _withTimeout(
+        _db.collection('operatorIds').doc('${role}_${employeeId.trim()}').get(),
+        'Verifying your employee ID',
+      );
+      if (invite.data()?['approved'] != true ||
+          invite.data()?['role'] != role) {
+        throw StateError(
+          'Employee ID verification failed. Please use a valid approved ID.',
+        );
+      }
+    }
+
+    final credential = await _withTimeout(
+      _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      ),
+      'Creating your account',
+    );
+
+    await _withTimeout(
+      _db.collection('users').doc(credential.user!.uid).set({
+        'email': email.trim(),
+        'role': role,
+        'employeeId': role == 'passenger' ? '' : employeeId.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      }),
+      'Saving your account',
+    );
+    if (role == 'driver') {
+      await _withTimeout(
+        _db.collection('drivers').doc(credential.user!.uid).set({
+          'userId': credential.user!.uid,
+          'email': email.trim(),
+          'employeeId': employeeId.trim(),
+          'status': 'offline',
+          'createdAt': FieldValue.serverTimestamp(),
+        }),
+        'Setting up your driver profile',
+      );
+    }
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
     return credential;
   }
@@ -121,4 +185,14 @@ class AuthenticationService {
   Future<void> signOut() {
     return _auth.signOut();
   }
+
+  Future<T> _withTimeout<T>(
+    Future<T> request,
+    String action,
+  ) => request.timeout(
+    _requestTimeout,
+    onTimeout: () => throw TimeoutException(
+      '$action took too long. Check your internet connection and try again.',
+    ),
+  );
 }

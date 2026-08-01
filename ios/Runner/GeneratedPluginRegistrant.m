@@ -42,12 +42,6 @@
 @import firebase_storage;
 #endif
 
-#if __has_include(<flutter_local_notifications/FlutterLocalNotificationsPlugin.h>)
-#import <flutter_local_notifications/FlutterLocalNotificationsPlugin.h>
-#else
-@import flutter_local_notifications;
-#endif
-
 #if __has_include(<geolocator_apple/GeolocatorPlugin.h>)
 #import <geolocator_apple/GeolocatorPlugin.h>
 #else
@@ -66,12 +60,6 @@
 @import mobile_scanner;
 #endif
 
-#if __has_include(<package_info_plus/FPPPackageInfoPlusPlugin.h>)
-#import <package_info_plus/FPPPackageInfoPlusPlugin.h>
-#else
-@import package_info_plus;
-#endif
-
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
@@ -81,11 +69,9 @@
   [FLTFirebaseCorePlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseCorePlugin"]];
   [FLTFirebaseMessagingPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseMessagingPlugin"]];
   [FLTFirebaseStoragePlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseStoragePlugin"]];
-  [FlutterLocalNotificationsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterLocalNotificationsPlugin"]];
   [GeolocatorPlugin registerWithRegistrar:[registry registrarForPlugin:@"GeolocatorPlugin"]];
   [FLTImagePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTImagePickerPlugin"]];
   [MobileScannerPlugin registerWithRegistrar:[registry registrarForPlugin:@"MobileScannerPlugin"]];
-  [FPPPackageInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPPackageInfoPlusPlugin"]];
 }
 
 @end

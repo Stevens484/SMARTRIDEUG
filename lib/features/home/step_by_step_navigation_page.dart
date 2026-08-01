@@ -1,4 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class StepByStepNavigationPage extends StatefulWidget {
   final String busNumber;
@@ -97,29 +100,7 @@ class _MapView extends StatelessWidget {
     return SafeArea(
       child: Stack(
         children: [
-          // Map placeholder
-          Container(
-            color: Colors.grey[200],
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.map, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Live Map View',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Route visualization from $currentStop to $nextStop',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _NavigationMap(busNumber: busNumber),
           // Bus info header
           Positioned(
             top: 16,
@@ -267,6 +248,66 @@ class _MapView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NavigationMap extends StatelessWidget {
+  const _NavigationMap({required this.busNumber});
+  final String busNumber;
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('busLocations')
+        .where('busNumber', isEqualTo: busNumber)
+        .limit(1)
+        .snapshots(),
+    builder: (context, snapshot) {
+      final data = snapshot.data?.docs.firstOrNull?.data();
+      final latitude = (data?['latitude'] as num?)?.toDouble();
+      final longitude = (data?['longitude'] as num?)?.toDouble();
+      if (latitude == null || longitude == null) {
+        return const ColoredBox(
+          color: Color(0xFFF8FAFC),
+          child: Center(
+            child: Text(
+              'Waiting for this bus to share its live location.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
+          ),
+        );
+      }
+      final position = LatLng(latitude, longitude);
+      return FlutterMap(
+        options: MapOptions(initialCenter: position, initialZoom: 15),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: const ['a', 'b', 'c'],
+            userAgentPackageName: 'com.mhl.smartrideug',
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: position,
+                width: 48,
+                height: 48,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF6B00),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.directions_bus, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _StopDetailsView extends StatelessWidget {

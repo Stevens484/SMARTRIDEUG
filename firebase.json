@@ -1,22 +1,6 @@
 {
   "firestore": {
-    "rules": "firestore.rules"
-  },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "disallowLegacyRuntimeConfig": true,
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ],
-      "predeploy": [
-        "npm --prefix functions run lint"
-      ]
-    }
-  ]
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
 }

@@ -28,6 +28,7 @@ class AuthenticationPage extends StatefulWidget {
 class _AuthenticationPageState extends State<AuthenticationPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+<<<<<<< HEAD
   final _name = TextEditingController();
   late bool _register = widget.operator ? false : widget.register;
   late final bool _operator = widget.operator;
@@ -35,6 +36,14 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
   bool _busy = false;
   bool _passwordVisible = false;
 
+=======
+  final _employeeId = TextEditingController();
+  late bool _register = widget.register;
+  late final bool _operator = widget.operator;
+  late final String _role = widget.role;
+  bool _busy = false;
+  bool _obscurePassword = true;
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   @override
   void dispose() {
     _email.dispose();
@@ -83,6 +92,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     setState(() => _busy = true);
     try {
       final auth = AuthenticationService();
+<<<<<<< HEAD
       if (_register) {
         await auth.registerWithEmail(
           email: _email.text,
@@ -100,6 +110,21 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
         await LocalNotificationService.instance.showWelcome();
       }
       await _goToRoleHome();
+=======
+      final credential = _register
+          ? await _registerUser(auth)
+          : await _signInUser(auth);
+      // Every email/password account is routed from its saved role. The public
+      // Login button is also used by administrators and drivers, so treating
+      // it as passenger-only would send them to the wrong workspace.
+      final role = await auth.roleForUser(credential.user!);
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => _dashboardFor(role)),
+          (_) => false,
+        );
+      }
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -111,6 +136,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     }
   }
 
+<<<<<<< HEAD
   String get _headline {
     if (_operator) {
       return _role == 'admin' ? 'Admin sign in' : 'Driver sign in';
@@ -127,6 +153,43 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
         : 'Sign in to continue your journey.';
   }
 
+=======
+  Future<dynamic> _registerUser(AuthenticationService auth) {
+    if (_operator) {
+      return auth.registerWithEmail(
+        email: _email.text,
+        password: _password.text,
+        role: _role,
+        employeeId: _employeeId.text,
+      );
+    }
+    return auth.registerWithEmail(
+      email: _email.text,
+      password: _password.text,
+      role: 'passenger',
+      employeeId: '',
+    );
+  }
+
+  Future<dynamic> _signInUser(AuthenticationService auth) {
+    if (_operator) {
+      return auth.signInWithEmail(
+        _email.text,
+        _password.text,
+        role: _role,
+        employeeId: _employeeId.text,
+      );
+    }
+    return auth.signInWithEmail(_email.text, _password.text);
+  }
+
+  Widget _dashboardFor(String role) => switch (role) {
+    'admin' => const AdminDashboardPage(),
+    'driver' => const DriverDashboardPage(),
+    _ => const HomePage(),
+  };
+
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppTheme.grey50,
@@ -138,6 +201,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
+<<<<<<< HEAD
     ),
     body: SafeArea(
       child: Center(
@@ -160,6 +224,22 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                     decoration: BoxDecoration(
                       color: AppTheme.primarySoft,
                       shape: BoxShape.circle,
+=======
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/logo.png',
+                      width: 68,
+                      height: 68,
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                     ),
                     child: Image.asset(
                       'assets/images/smartride_mark.png',
@@ -241,6 +321,91 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
 
                   if (!_operator) ...[
                     const SizedBox(height: 12),
+<<<<<<< HEAD
+=======
+                    Text(
+                      _register ? 'Create your account' : 'Welcome back',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _register
+                          ? 'Start riding SmartRide UG.'
+                          : 'Sign in to continue your journey.',
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email address',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _password,
+                      obscureText: _obscurePassword,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      decoration: InputDecoration(
+                        labelText: _operator
+                            ? 'Password (employee ID for staff accounts)'
+                            : 'Password',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _obscurePassword
+                              ? 'Show password'
+                              : 'Hide password',
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_operator) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _employeeId,
+                        decoration: const InputDecoration(
+                          labelText: 'Employee ID',
+                          helperText:
+                              'For accounts added by an admin, use this as the password too.',
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Operator role',
+                          prefixIcon: Icon(Icons.work_outline),
+                        ),
+                        child: Text(
+                          _role == 'admin' ? 'Admin' : 'Driver',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _busy ? null : _submit,
+                        child: Text(
+                          _busy
+                              ? 'Please wait...'
+                              : _register
+                              ? 'Register'
+                              : 'Login',
+                        ),
+                      ),
+                    ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                     TextButton(
                       onPressed: _busy
                           ? null

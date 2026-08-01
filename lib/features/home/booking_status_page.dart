@@ -1,29 +1,36 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+<<<<<<< HEAD
+import 'package:firebase_auth/firebase_auth.dart';
+=======
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:smartrideug/core/services/local_notification_service.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:smartrideug/core/services/passenger_live_location_service.dart';
 import 'package:smartrideug/core/services/transit_repository.dart';
-import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/features/home/booking_confirmed_page.dart';
-import 'package:smartrideug/features/home/momo_payment_page.dart';
+import 'package:smartrideug/features/map/route_map_panel.dart';
 
 class BookingStatusPage extends StatefulWidget {
+<<<<<<< HEAD
   final String bookingId;
 
   const BookingStatusPage({super.key, required this.bookingId});
+=======
+  const BookingStatusPage({super.key, required this.bookingId});
+  final String bookingId;
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
   @override
   State<BookingStatusPage> createState() => _BookingStatusPageState();
 }
 
 class _BookingStatusPageState extends State<BookingStatusPage> {
-  bool _isUpdating = false;
-  bool _checkingArrival = false;
-  Timer? _expiryTimer;
-  int? _scheduledExpiryMilliseconds;
-  StreamSubscription<ArrivalNotificationAction>? _actionSubscription;
+<<<<<<< HEAD
+  bool _isCancelling = false;
+  bool _autoCancellationScheduled = false;
+  bool _expired = false;
 
   DocumentReference<Map<String, dynamic>> get _bookingRef =>
       FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId);
@@ -80,6 +87,12 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
       if (mounted) setState(() => _isUpdating = false);
     }
   }
+=======
+  final _location = PassengerLiveLocationService();
+  final _repository = TransitRepository();
+  bool _locationStarted = false;
+  bool _processing = false;
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
   Future<void> _cancelBooking() async {
     if (_isUpdating) return;
@@ -162,8 +175,121 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  void dispose() {
+    _location.dispose();
+    super.dispose();
+  }
+
+  void _syncLiveLocation(Map<String, dynamic>? booking) {
+    if (booking == null) return;
+    const waiting = {'held', 'confirmed', 'active', 'boarding'};
+    final status = booking['status']?.toString().toLowerCase();
+    if (waiting.contains(status) && !_locationStarted) {
+      _locationStarted = true;
+      _location.start(widget.bookingId).catchError((_) {
+        if (mounted) setState(() => _locationStarted = false);
+      });
+    } else if (!waiting.contains(status) && _locationStarted) {
+      _locationStarted = false;
+      _location.stop(widget.bookingId, boarded: status == 'boarded');
+    }
+  }
+
+  Future<void> _confirm() async {
+    setState(() => _processing = true);
+    try {
+      await _repository.confirmSeatHold(widget.bookingId);
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => BookingConfirmedPage(bookingId: widget.bookingId),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
+  }
+
+  Future<void> _cancel() async {
+    setState(() => _processing = true);
+    try {
+      await _repository.cancelSeatHold(widget.bookingId);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(widget.bookingId)
+            .snapshots(),
+        builder: (context, bookingSnapshot) {
+          final booking = bookingSnapshot.data?.data();
+          if (bookingSnapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (booking == null) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Booking status')),
+              body: const Center(child: Text('This booking is unavailable.')),
+            );
+          }
+          _syncLiveLocation(booking);
+          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('busLocations')
+                .doc(booking['busId'])
+                .snapshots(),
+            builder: (context, locationSnapshot) =>
+                _page(context, booking, locationSnapshot.data?.data()),
+          );
+        },
+      );
+
+  Widget _page(
+    BuildContext context,
+    Map<String, dynamic> booking,
+    Map<String, dynamic>? location,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final status = booking['status']?.toString().toLowerCase() ?? 'held';
+    final distance = _distanceToPickup(booking, location);
+    final canConfirm = status == 'held' && distance != null && distance <= 100;
+    final title = status == 'confirmed'
+        ? 'Seat confirmed'
+        : status == 'cancelled'
+        ? 'Booking cancelled'
+        : canConfirm
+        ? 'Your bus has arrived'
+        : 'Seat held';
+    final message = status == 'confirmed'
+        ? 'Your seat is now permanently reserved. Show your ticket when you board.'
+        : status == 'cancelled'
+        ? 'This seat hold has been released.'
+        : canConfirm
+        ? 'Your bus is at the pickup point. Confirm that you are ready to board.'
+        : distance == null
+        ? 'We are waiting for the bus to share its live location.'
+        : 'We will prompt you when the bus is within 100 m of your pickup point.';
     return Scaffold(
+<<<<<<< HEAD
       appBar: AppBar(title: const Text('Booking Status'), elevation: 0),
       body: SafeArea(
         child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -232,123 +358,146 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
               },
             );
           },
+=======
+      appBar: AppBar(title: const Text('Booking status')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 29,
+                      backgroundColor: scheme.secondaryContainer,
+                      child: Icon(
+                        status == 'confirmed'
+                            ? Icons.check_circle_rounded
+                            : Icons.hourglass_top_rounded,
+                        color: scheme.secondary,
+                        size: 29,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            message,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            _routeMap(booking),
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Booking details',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 22),
+                    _detail(context, 'Booking ID', widget.bookingId),
+                    _detail(
+                      context,
+                      'Bus',
+                      booking['plateNumber']?.toString().isNotEmpty == true
+                          ? booking['plateNumber'].toString()
+                          : booking['busNumber']?.toString() ?? 'Unavailable',
+                    ),
+                    _detail(
+                      context,
+                      'Route',
+                      '${booking['origin'] ?? ''} → ${booking['destination'] ?? ''}',
+                    ),
+                    _detail(
+                      context,
+                      'Pickup',
+                      booking['pickupStopName']?.toString() ?? 'Unavailable',
+                    ),
+                    _detail(
+                      context,
+                      'Seats',
+                      (booking['seats'] as Iterable?)?.join(', ') ??
+                          'Unavailable',
+                    ),
+                    if (distance != null)
+                      _detail(
+                        context,
+                        'Bus distance',
+                        '${distance.round()} m from pickup',
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (status == 'held' && canConfirm) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _processing ? null : _confirm,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: Text(
+                    _processing ? 'Confirming...' : 'I am ready to board',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (status == 'held')
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _processing ? null : _cancel,
+                  child: const Text('Cancel seat hold'),
+                ),
+              ),
+            if (status == 'confirmed')
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          BookingConfirmedPage(bookingId: widget.bookingId),
+                    ),
+                  ),
+                  child: const Text('View digital ticket'),
+                ),
+              ),
+          ],
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
       ),
     );
   }
 
-  Widget _content({
-    required Map<String, dynamic> booking,
-    required String status,
-    required bool readyToConfirm,
-  }) {
-    var icon = Icons.help_outline;
-    var color = AppTheme.grey500;
-    var title = status;
-    var subtitle = 'Unknown booking status';
-    switch (status) {
-      case 'pending_confirmation':
-        icon = readyToConfirm ? Icons.directions_bus : Icons.hourglass_top;
-        color = readyToConfirm ? AppTheme.primary : AppTheme.navy;
-        title = readyToConfirm ? 'Your bus has arrived' : 'Seat held';
-        subtitle = readyToConfirm
-            ? 'Are you ready to board? Confirm within 2 minutes.'
-            : 'We will alert you when your bus reaches the pickup stop.';
-        break;
-      case 'confirmed':
-        icon = Icons.check_circle;
-        color = AppTheme.success;
-        title = 'Confirmed';
-        subtitle = "You're all set";
-        break;
-      case 'cancelled':
-      case 'expired':
-        icon = Icons.cancel;
-        color = Colors.red;
-        title = status == 'expired' ? 'Expired' : 'Cancelled';
-        subtitle = status == 'expired'
-            ? 'Your temporary seat hold has been released.'
-            : 'Your temporary seat hold has been released.';
-        break;
-    }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: color,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Card(
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Booking Details',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
-                _detailRow('Booking ID', widget.bookingId),
-                _detailRow('Bus', booking['busNumber']?.toString() ?? 'N/A'),
-                _detailRow('Route', booking['routeName']?.toString() ?? 'N/A'),
-                _detailRow(
-                  'Pickup',
-                  booking['pickupStopName']?.toString() ?? 'N/A',
-                ),
-                _detailRow(
-                  'Seats',
-                  (booking['seats'] as List?)?.join(', ') ?? 'N/A',
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        if (status == 'pending_confirmation' && readyToConfirm) ...[
+<<<<<<< HEAD
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           SizedBox(
             height: 54,
             child: ElevatedButton(
@@ -417,26 +566,68 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
       ],
     );
   }
+=======
+  Widget _routeMap(Map<String, dynamic> booking) =>
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('routes')
+            .doc(booking['routeId'])
+            .snapshots(),
+        builder: (context, routeSnapshot) {
+          final route = routeSnapshot.data?.data();
+          if (route == null) return const SizedBox.shrink();
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              height: 220,
+              child: RouteMapPanel(
+                routeId: booking['routeId'].toString(),
+                route: route,
+              ),
+            ),
+          );
+        },
+      );
 
-  Widget _detailRow(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
+  double? _distanceToPickup(
+    Map<String, dynamic> booking,
+    Map<String, dynamic>? location,
+  ) {
+    final pickupLat = booking['pickupLatitude'];
+    final pickupLng = booking['pickupLongitude'];
+    final busLat = location?['currentLatitude'] ?? location?['latitude'];
+    final busLng = location?['currentLongitude'] ?? location?['longitude'];
+    if (pickupLat is! num ||
+        pickupLng is! num ||
+        busLat is! num ||
+        busLng is! num) {
+      return null;
+    }
+    return const Distance().as(
+      LengthUnit.Meter,
+      LatLng(pickupLat.toDouble(), pickupLng.toDouble()),
+      LatLng(busLat.toDouble(), busLng.toDouble()),
+    );
+  }
+
+  Widget _detail(BuildContext context, String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
+          width: 105,
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+            textAlign: TextAlign.end,
+            style: Theme.of(context).textTheme.titleSmall,
           ),
         ),
       ],
     ),
   );
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 }

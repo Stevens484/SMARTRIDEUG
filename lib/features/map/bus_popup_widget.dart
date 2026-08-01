@@ -129,7 +129,7 @@ class BusPopupWidget extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          // 🔥 FIXED: Book Seat button uses Navigator.push with proper route
+          // 🔥 FIXED: Book Seat button passes all required data
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -142,15 +142,26 @@ class BusPopupWidget extends StatelessWidget {
               ),
               onPressed: () {
                 Navigator.pop(context);
-                // 🔥 FIX: Use direct Navigation with MaterialPageRoute
+                // 🔥 FIX: Pass all required data to the route
+<<<<<<< HEAD
                 Navigator.pushNamed(
                   context,
                   '/confirm-seat',
                   arguments: {
                     'busId': bus.id,
-                    'routeName': bus.routeName,
-                    'availableSeats': bus.availableSeats,
+                    'routeId': 'route_001', // You can make this dynamic later
+                    'busNumber': bus.id.replaceAll('BUS-', ''),
+                    'farePerSeat': 3000,
+                    'seats': ['1A'], // Default seat selection
                   },
+=======
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Open the assigned route to choose the live bus and its actual seats.',
+                    ),
+                  ),
+>>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                 );
               },
               child: const Row(

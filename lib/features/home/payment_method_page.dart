@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class PaymentMethodPage extends StatelessWidget {
+class PaymentMethodPage extends StatefulWidget {
   const PaymentMethodPage({super.key});
 
   CollectionReference<Map<String, dynamic>> _methods(String uid) =>
@@ -85,6 +85,75 @@ class PaymentMethodPage extends StatelessWidget {
   }
 
   @override
+  State<PaymentMethodPage> createState() => _PaymentMethodPageState();
+}
+
+class _PaymentMethodPageState extends State<PaymentMethodPage> {
+  Future<void> _addMethod(String uid) async {
+    final phoneController = TextEditingController();
+    String provider = 'MTN Mobile Money';
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add payment method'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: provider,
+                decoration: const InputDecoration(labelText: 'Provider'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'MTN Mobile Money',
+                    child: Text('MTN Mobile Money'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Airtel Money',
+                    child: Text('Airtel Money'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setDialogState(() => provider = value);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Phone number'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true && phoneController.text.trim().isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('paymentMethods')
+          .add({
+            'title': provider,
+            'subtitle': phoneController.text.trim(),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
@@ -103,39 +172,35 @@ class PaymentMethodPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           final methods = snapshot.data!.docs;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
-                'Your default method is used for the simulated checkout.',
-              ),
-              const SizedBox(height: 12),
-              ...methods.map((method) {
-                final data = method.data();
-                final isDefault = data['isDefault'] == true;
-                return Card(
-                  child: ListTile(
-                    onTap: isDefault
-                        ? null
-                        : () => _makeDefault(uid, method.reference),
-                    leading: const Icon(
-                      Icons.account_balance_wallet,
-                      color: Color(0xFFFFC107),
-                    ),
-                    title: Text(data['title']?.toString() ?? 'MTN MoMo'),
-                    subtitle: Text(data['subtitle']?.toString() ?? ''),
-                    trailing: isDefault
-                        ? const Chip(label: Text('Default'))
-                        : const Text('Set default'),
-                  ),
+          return ListView.separated(
+            padding: const EdgeInsets.all(16.0),
+            itemCount: methods.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              if (index == methods.length) {
+                return OutlinedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add payment method'),
+                  onPressed: () => _addMethod(uid),
                 );
-              }),
-              OutlinedButton.icon(
-                onPressed: () => _addMomo(context, uid),
-                icon: const Icon(Icons.add),
-                label: const Text('Add MTN MoMo number'),
-              ),
-            ],
+              }
+
+              final method = methods[index].data();
+              return Card(
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.payment,
+                    color: AppTheme.primaryGreen,
+                  ),
+                  title: Text(method['title']?.toString() ?? 'Payment method'),
+                  subtitle: Text(method['subtitle']?.toString() ?? ''),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => methods[index].reference.delete(),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),

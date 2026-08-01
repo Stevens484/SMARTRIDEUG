@@ -4,7 +4,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.google.gms:google-services:4.4.0")
+        // 🔥 UPGRADED to 4.4.2
+        classpath("com.google.gms:google-services:4.4.2")
     }
 }
 
