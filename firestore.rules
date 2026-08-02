@@ -93,6 +93,91 @@ service cloud.firestore {
         get(/databases/$(database)/documents/operatorIds/
           $(request.resource.data.role + '_' + request.resource.data.employeeId)).data.role == request.resource.data.role;
     }
+    function isValidRoutePoint(routeId, stopId) {
+      return request.resource.data.keys().hasAll([
+          'routeId', 'stopId', 'name', 'type', 'latitude', 'longitude', 'order'
+        ]) &&
+        request.resource.data.routeId == routeId &&
+        request.resource.data.stopId == stopId &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() <= 120 &&
+        request.resource.data.type in ['pickup', 'stop', 'both'] &&
+        request.resource.data.latitude is number &&
+        request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90 &&
+        request.resource.data.longitude is number &&
+        request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180 &&
+        request.resource.data.order is number && request.resource.data.order >= 0;
+    }
+    function isValidRouteFare(fareId) {
+      return request.resource.data.keys().hasAll([
+          'routeId', 'routeName', 'pickupStopId', 'pickupStopName',
+          'destinationStopId', 'destinationStopName', 'farePerSeat'
+        ]) &&
+        fareId == request.resource.data.routeId + '_' +
+          request.resource.data.pickupStopId + '_' +
+          request.resource.data.destinationStopId &&
+        request.resource.data.routeId is string &&
+        request.resource.data.routeId.size() > 0 &&
+        request.resource.data.routeName is string &&
+        request.resource.data.routeName.size() > 0 &&
+        request.resource.data.routeName.size() <= 160 &&
+        request.resource.data.pickupStopId is string &&
+        request.resource.data.pickupStopName is string &&
+        request.resource.data.pickupStopName.size() > 0 &&
+        request.resource.data.pickupStopName.size() <= 120 &&
+        request.resource.data.destinationStopId is string &&
+        request.resource.data.destinationStopName is string &&
+        request.resource.data.destinationStopName.size() > 0 &&
+        request.resource.data.destinationStopName.size() <= 120 &&
+        request.resource.data.farePerSeat is int &&
+        request.resource.data.farePerSeat > 0 &&
+        getAfter(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.pickupStopId)).data.type in ['pickup', 'stop', 'both'] &&
+        getAfter(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.destinationStopId)).data.type in ['pickup', 'stop', 'both'] &&
+        getAfter(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.pickupStopId)).data.order <
+          getAfter(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.destinationStopId)).data.order;
+    }
+    function isValidHeldBooking() {
+      return request.resource.data.keys().hasAll([
+          'passengerId', 'busId', 'routeId', 'pickupStopId', 'pickupStopName',
+          'pickupLatitude', 'pickupLongitude', 'destinationStopId',
+          'destinationStopName', 'seats', 'fareType', 'distanceKm',
+          'distanceSource', 'farePerSeat', 'fare', 'momoPhone', 'status'
+        ]) &&
+        request.resource.data.passengerId == request.auth.uid &&
+        request.resource.data.busId is string &&
+        request.resource.data.routeId is string &&
+        request.resource.data.pickupStopId is string &&
+        request.resource.data.destinationStopId is string &&
+        request.resource.data.pickupStopName is string &&
+        request.resource.data.destinationStopName is string &&
+        request.resource.data.pickupLatitude is number &&
+        request.resource.data.pickupLongitude is number &&
+        request.resource.data.seats is list &&
+        request.resource.data.seats.size() > 0 && request.resource.data.seats.size() <= 8 &&
+        request.resource.data.distanceKm is number && request.resource.data.distanceKm > 0 &&
+        request.resource.data.distanceSource == 'road_route' &&
+        request.resource.data.farePerSeat is int && request.resource.data.farePerSeat > 0 &&
+        request.resource.data.fare is int &&
+        request.resource.data.fare == request.resource.data.farePerSeat * request.resource.data.seats.size() &&
+        request.resource.data.momoPhone is string && request.resource.data.momoPhone.size() <= 40 &&
+        request.resource.data.status == 'held' &&
+        get(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.pickupStopId)).data.type in ['pickup', 'stop', 'both'] &&
+        get(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.destinationStopId)).data.type in ['pickup', 'stop', 'both'] &&
+        get(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.pickupStopId)).data.order <
+          get(/databases/$(database)/documents/routes/$(request.resource.data.routeId)/stops/
+          $(request.resource.data.destinationStopId)).data.order &&
+        request.resource.data.fareType == 'fixed_route' &&
+        get(/databases/$(database)/documents/fares/
+          $(request.resource.data.routeId + '_' + request.resource.data.pickupStopId + '_' + request.resource.data.destinationStopId)).data.farePerSeat == request.resource.data.farePerSeat;
+    }
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
@@ -119,24 +204,33 @@ service cloud.firestore {
     }
 
     match /{collection}/{document} {
-      allow read: if collection in ['buses', 'routes', 'stops', 'helpSupport'];
+      allow read: if signedIn() && collection in ['buses', 'routes', 'helpSupport'];
       allow write: if isAdmin() &&
-        collection in ['buses', 'routes', 'stops', 'helpSupport', 'fares'];
+        collection in ['buses', 'routes', 'helpSupport'];
     }
 
-    // Stops are stored beneath their route as well as in the top-level stops
-    // collection, so route maps can load an ordered route directly.
-    match /routes/{routeId}/stops/{stopId} {
+    // A fare belongs to one ordered pickup-to-stop pair. Passengers only read
+    // it to calculate their own selected journey; administrators maintain it.
+    match /fares/{fareId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isValidRouteFare(fareId);
+      allow delete: if isAdmin();
+    }
+
+    // Pickup points and destination stops are separate records. They are
+    // mirrored under a route so the map and fare engine share one ordered path.
+    match /stops/{stopId} {
       allow read: if signedIn();
       allow create, update: if isAdmin() &&
-        request.resource.data.name is string &&
-        request.resource.data.name.size() > 0 &&
-        request.resource.data.name.size() <= 120 &&
-        request.resource.data.latitude is number &&
-        request.resource.data.longitude is number &&
-        request.resource.data.order is number &&
-        request.resource.data.farePerKilometre is number &&
-        request.resource.data.farePerKilometre > 0;
+        isValidRoutePoint(request.resource.data.routeId, stopId);
+      allow delete: if isAdmin();
+    }
+
+    // Points are stored beneath their route as well as in the top-level stops
+    // collection, so route maps and road-fare calculations use the same path.
+    match /routes/{routeId}/stops/{stopId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isValidRoutePoint(routeId, stopId);
       allow delete: if isAdmin();
     }
 
@@ -186,13 +280,7 @@ service cloud.firestore {
         (ownsBooking() || isAdmin() ||
           isAssignedDriver(resource.data.busId));
       allow create: if signedIn() &&
-        request.resource.data.passengerId == request.auth.uid &&
-        request.resource.data.busId is string &&
-        request.resource.data.routeId is string &&
-        request.resource.data.seats is list &&
-        request.resource.data.seats.size() > 0 &&
-        request.resource.data.seats.size() <= 8 &&
-        request.resource.data.status == 'held';
+        isValidHeldBooking();
       allow update: if isAdmin() || driverMayUpdateBooking() ||
         passengerMayChangeBooking();
       allow delete: if isAdmin();

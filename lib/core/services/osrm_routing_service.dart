@@ -4,10 +4,22 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 class OsrmRoute {
-  const OsrmRoute({required this.points, required this.duration});
+  const OsrmRoute({
+    required this.points,
+    required this.duration,
+    required this.distanceMetres,
+    this.legDurations = const [],
+  });
 
   final List<LatLng> points;
   final Duration duration;
+
+  /// Distance along the road route returned by OSRM, not a straight-line
+  /// measurement between stops.
+  final double distanceMetres;
+
+  /// Travel duration for each consecutive waypoint pair, in the order sent.
+  final List<Duration> legDurations;
 }
 
 /// Retrieves road-following route geometry and travel time from OSRM.
@@ -48,8 +60,9 @@ class OsrmRoutingService {
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final routes = body['routes'] as List<dynamic>?;
-    if (routes == null || routes.isEmpty)
+    if (routes == null || routes.isEmpty) {
       throw StateError('No road route was found.');
+    }
     final route = routes.first as Map<String, dynamic>;
     final routeCoordinates =
         (route['geometry'] as Map<String, dynamic>)['coordinates']
@@ -60,6 +73,14 @@ class OsrmRoutingService {
         return LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
       }).toList(),
       duration: Duration(seconds: ((route['duration'] as num?) ?? 0).round()),
+      distanceMetres: ((route['distance'] as num?) ?? 0).toDouble(),
+      legDurations: (route['legs'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (leg) =>
+                Duration(seconds: ((leg['duration'] as num?) ?? 0).round()),
+          )
+          .toList(),
     );
   }
 }
