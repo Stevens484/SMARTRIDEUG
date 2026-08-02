@@ -88,7 +88,6 @@ flutter:
 >>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   uses-material-design: true
   assets:
-    - assets/images/landscreen.jpg
     - assets/images/smartride_wordmark.png
     - assets/images/smartride_mark.png
 

@@ -45,16 +45,16 @@ class SplashPage extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/images/landscreen.jpg', fit: BoxFit.cover),
+          Image.asset('assets/images/landing.png', fit: BoxFit.cover),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xE60B1F3A),
-                  Color(0xED102B4E),
-                  Color(0xF516365F),
+                  Color(0xBF0B1F3A),
+                  Color(0xC7102B4E),
+                  Color(0xCF16365F),
                 ],
               ),
             ),
