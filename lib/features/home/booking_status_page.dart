@@ -1,10 +1,4 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-<<<<<<< HEAD
-import 'package:firebase_auth/firebase_auth.dart';
-=======
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:smartrideug/core/services/passenger_live_location_service.dart';
@@ -13,166 +7,20 @@ import 'package:smartrideug/features/home/booking_confirmed_page.dart';
 import 'package:smartrideug/features/map/route_map_panel.dart';
 
 class BookingStatusPage extends StatefulWidget {
-<<<<<<< HEAD
-  final String bookingId;
-
-  const BookingStatusPage({super.key, required this.bookingId});
-=======
   const BookingStatusPage({super.key, required this.bookingId});
   final String bookingId;
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 
   @override
   State<BookingStatusPage> createState() => _BookingStatusPageState();
 }
 
 class _BookingStatusPageState extends State<BookingStatusPage> {
-<<<<<<< HEAD
-  bool _isCancelling = false;
-  bool _autoCancellationScheduled = false;
-  bool _expired = false;
-
-  DocumentReference<Map<String, dynamic>> get _bookingRef =>
-      FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId);
-
-  @override
-  void initState() {
-    super.initState();
-    _actionSubscription = LocalNotificationService.instance.actions.listen((
-      action,
-    ) {
-      if (action.bookingId != widget.bookingId) return;
-      if (action.actionId == 'confirm') {
-        _confirmBooking();
-      } else if (action.actionId == 'cancel') {
-        _cancelBooking();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _expiryTimer?.cancel();
-    _actionSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _confirmBooking() async {
-    if (_isUpdating) return;
-    setState(() => _isUpdating = true);
-    try {
-      final snapshot = await _bookingRef.get();
-      final booking = snapshot.data();
-      final expiresAt = booking?['expiresAt'];
-      if (booking == null || expiresAt is! Timestamp) {
-        throw StateError('Your payment window is not available.');
-      }
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MomoPaymentPage(
-            bookingId: widget.bookingId,
-            fare: (booking['fare'] as num?)?.toInt() ?? 0,
-            expiresAt: expiresAt.toDate(),
-          ),
-        ),
-      );
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _isUpdating = false);
-    }
-  }
-=======
   final _location = PassengerLiveLocationService();
   final _repository = TransitRepository();
   bool _locationStarted = false;
   bool _processing = false;
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
-
-  Future<void> _cancelBooking() async {
-    if (_isUpdating) return;
-    setState(() => _isUpdating = true);
-    try {
-      await TransitRepository().cancelBooking(widget.bookingId);
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _isUpdating = false);
-    }
-  }
-
-  Future<void> _expireBooking() async {
-    try {
-      await TransitRepository().expireBooking(widget.bookingId);
-    } catch (_) {
-      // The stream will continue to show the pending state if a network error
-      // occurs, allowing the next foreground update to try again safely.
-    }
-  }
-
-  void _scheduleExpiry(Map<String, dynamic> booking) {
-    final expiresAt = booking['expiresAt'];
-    if (expiresAt is! Timestamp) return;
-    final milliseconds = expiresAt.millisecondsSinceEpoch;
-    if (_scheduledExpiryMilliseconds == milliseconds) return;
-    _scheduledExpiryMilliseconds = milliseconds;
-    _expiryTimer?.cancel();
-    final delay = expiresAt.toDate().difference(DateTime.now());
-    _expiryTimer = Timer(
-      delay.isNegative ? Duration.zero : delay,
-      _expireBooking,
-    );
-  }
-
-  void _watchArrival({
-    required Map<String, dynamic> booking,
-    required Map<String, dynamic> bus,
-    required Map<String, dynamic> stop,
-  }) {
-    if (_checkingArrival || booking['arrivalNotifiedAt'] != null) return;
-    final latitude = bus['latitude'];
-    final longitude = bus['longitude'];
-    final stopLatitude = stop['latitude'];
-    final stopLongitude = stop['longitude'];
-    if (latitude is! num ||
-        longitude is! num ||
-        stopLatitude is! num ||
-        stopLongitude is! num) {
-      return;
-    }
-    final metres = Geolocator.distanceBetween(
-      latitude.toDouble(),
-      longitude.toDouble(),
-      stopLatitude.toDouble(),
-      stopLongitude.toDouble(),
-    );
-    if (metres > 100) return;
-
-    _checkingArrival = true;
-    unawaited(() async {
-      try {
-        final opened = await TransitRepository().markBusArrived(
-          widget.bookingId,
-        );
-        if (opened) {
-          await LocalNotificationService.instance.showBusArrival(
-            widget.bookingId,
-          );
-        }
-      } finally {
-        _checkingArrival = false;
-      }
-    }());
-  }
+  Future<BookingTripEta>? _etaFuture;
+  String? _etaSignature;
 
   @override
   void dispose() {
@@ -193,6 +41,32 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
       _locationStarted = false;
       _location.stop(widget.bookingId, boarded: status == 'boarded');
     }
+  }
+
+  Future<BookingTripEta>? _etaFor(
+    Map<String, dynamic> booking,
+    Map<String, dynamic>? location,
+  ) {
+    final latitude = location?['currentLatitude'] ?? location?['latitude'];
+    final longitude = location?['currentLongitude'] ?? location?['longitude'];
+    if (latitude is! num || longitude is! num) return null;
+    // GPS updates can be very frequent. Rounding to ~11 m preserves a useful
+    // live ETA while preventing a duplicate road-route request for tiny moves.
+    final signature = [
+      booking['busId'],
+      booking['pickupStopId'],
+      booking['destinationStopId'],
+      latitude.toDouble().toStringAsFixed(4),
+      longitude.toDouble().toStringAsFixed(4),
+    ].join(':');
+    if (signature != _etaSignature) {
+      _etaSignature = signature;
+      _etaFuture = _repository.estimateBookingEta(
+        booking: booking,
+        location: location,
+      );
+    }
+    return _etaFuture;
   }
 
   Future<void> _confirm() async {
@@ -271,6 +145,7 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
     final scheme = Theme.of(context).colorScheme;
     final status = booking['status']?.toString().toLowerCase() ?? 'held';
     final distance = _distanceToPickup(booking, location);
+    final eta = _etaFor(booking, location);
     final canConfirm = status == 'held' && distance != null && distance <= 100;
     final title = status == 'confirmed'
         ? 'Seat confirmed'
@@ -289,76 +164,6 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
         ? 'We are waiting for the bus to share its live location.'
         : 'We will prompt you when the bus is within 100 m of your pickup point.';
     return Scaffold(
-<<<<<<< HEAD
-      appBar: AppBar(title: const Text('Booking Status'), elevation: 0),
-      body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: _bookingRef.snapshots(),
-          builder: (context, bookingSnapshot) {
-            if (!bookingSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final booking = bookingSnapshot.data!.data();
-            if (booking == null) {
-              return const Center(
-                child: Text('This booking is no longer available.'),
-              );
-            }
-            final status = booking['status']?.toString() ?? 'unknown';
-            if (status != 'pending_confirmation') {
-              return _content(
-                booking: booking,
-                status: status,
-                readyToConfirm: false,
-              );
-            }
-
-            _scheduleExpiry(booking);
-            final busId = booking['busId']?.toString() ?? '';
-            final stopId = booking['pickupStopId']?.toString() ?? '';
-            final routeId = booking['routeId']?.toString() ?? '';
-            if (busId.isEmpty || stopId.isEmpty || routeId.isEmpty) {
-              return _content(
-                booking: booking,
-                status: status,
-                readyToConfirm: false,
-              );
-            }
-            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('buses')
-                  .doc(busId)
-                  .snapshots(),
-              builder: (context, busSnapshot) {
-                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('routes')
-                      .doc(routeId)
-                      .collection('stops')
-                      .doc(stopId)
-                      .snapshots(),
-                  builder: (context, stopSnapshot) {
-                    final bus = busSnapshot.data?.data();
-                    final stop = stopSnapshot.data?.data();
-                    if (bus != null && stop != null) {
-                      _watchArrival(booking: booking, bus: bus, stop: stop);
-                    }
-                    final expiresAt = booking['expiresAt'];
-                    final readyToConfirm =
-                        booking['arrivalNotifiedAt'] != null &&
-                        expiresAt is Timestamp &&
-                        expiresAt.toDate().isAfter(DateTime.now());
-                    return _content(
-                      booking: booking,
-                      status: status,
-                      readyToConfirm: readyToConfirm,
-                    );
-                  },
-                );
-              },
-            );
-          },
-=======
       appBar: AppBar(title: const Text('Booking status')),
       body: SafeArea(
         child: ListView(
@@ -403,6 +208,14 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
             ),
             const SizedBox(height: 18),
             _routeMap(booking),
+            const SizedBox(height: 18),
+            _LiveTripEta(
+              eta: eta,
+              pickupName:
+                  booking['pickupStopName']?.toString() ?? 'Pickup point',
+              destinationName:
+                  booking['destinationStopName']?.toString() ?? 'Stop',
+            ),
             const SizedBox(height: 18),
             Card(
               child: Padding(
@@ -485,88 +298,11 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
                 ),
               ),
           ],
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
       ),
     );
   }
 
-<<<<<<< HEAD
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _isUpdating ? null : _confirmBooking,
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                "I'm Ready — Confirm Trip",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (status == 'pending_confirmation')
-          SizedBox(
-            height: 48,
-            child: OutlinedButton(
-              onPressed: _isUpdating ? null : _cancelBooking,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isUpdating
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text(
-                      'Cancel Booking',
-                      style: TextStyle(color: Colors.red),
-                    ),
-            ),
-          ),
-        if (status == 'confirmed') ...[
-          SizedBox(
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      BookingConfirmedPage(bookingId: widget.bookingId),
-                ),
-              ),
-              icon: const Icon(Icons.qr_code_2),
-              label: const Text('View QR Ticket'),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if ({'confirmed', 'cancelled', 'expired'}.contains(status))
-          SizedBox(
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () =>
-                  Navigator.of(context).popUntil((route) => route.isFirst),
-              child: const Text('Go Home'),
-            ),
-          ),
-      ],
-    );
-  }
-=======
   Widget _routeMap(Map<String, dynamic> booking) =>
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
@@ -629,5 +365,109 @@ class _BookingStatusPageState extends State<BookingStatusPage> {
       ],
     ),
   );
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
+}
+
+class _LiveTripEta extends StatelessWidget {
+  const _LiveTripEta({
+    required this.eta,
+    required this.pickupName,
+    required this.destinationName,
+  });
+
+  final Future<BookingTripEta>? eta;
+  final String pickupName;
+  final String destinationName;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: FutureBuilder<BookingTripEta>(
+        future: eta,
+        builder: (context, snapshot) {
+          if (eta == null) {
+            return const _EtaMessage(
+              icon: Icons.location_searching_outlined,
+              text: 'Waiting for the bus to share its live location.',
+            );
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const _EtaMessage(
+              icon: Icons.schedule_outlined,
+              text: 'Calculating your live road-route ETA…',
+            );
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return const _EtaMessage(
+              icon: Icons.schedule_outlined,
+              text: 'Live ETA is temporarily unavailable.',
+            );
+          }
+          final value = snapshot.data!;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Live trip ETA',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              const Text('Calculated from the bus’s current GPS location.'),
+              const SizedBox(height: 14),
+              _EtaRow(
+                icon: Icons.my_location_outlined,
+                label: 'Pickup · $pickupName',
+                minutes: value.pickupMinutes,
+              ),
+              const SizedBox(height: 10),
+              _EtaRow(
+                icon: Icons.location_on_outlined,
+                label: 'Stop · $destinationName',
+                minutes: value.destinationMinutes,
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+class _EtaMessage extends StatelessWidget {
+  const _EtaMessage({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, color: Theme.of(context).colorScheme.primary),
+      const SizedBox(width: 12),
+      Expanded(child: Text(text)),
+    ],
+  );
+}
+
+class _EtaRow extends StatelessWidget {
+  const _EtaRow({
+    required this.icon,
+    required this.label,
+    required this.minutes,
+  });
+  final IconData icon;
+  final String label;
+  final int minutes;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, size: 20),
+      const SizedBox(width: 10),
+      Expanded(child: Text(label)),
+      Text(
+        minutes <= 1 ? 'Arriving now' : '~$minutes min',
+        style: Theme.of(context).textTheme.titleSmall,
+      ),
+    ],
+  );
 }

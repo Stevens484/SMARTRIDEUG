@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:smartrideug/core/services/transit_repository.dart';
 import 'package:smartrideug/features/home/booking_status_page.dart';
 
-/// MoMo checkout for a selected bus. The fare rate is read from the
-/// administrator-managed origin pickup and is never editable by a passenger.
+/// MoMo checkout uses separately managed pickup points and stops. The quoted
+/// distance is the road path through the configured route, never a direct-line
+/// distance between the two selected places.
 class MomoPaymentPage extends StatefulWidget {
   const MomoPaymentPage({
     super.key,
@@ -25,7 +25,9 @@ class MomoPaymentPage extends StatefulWidget {
 class _MomoPaymentPageState extends State<MomoPaymentPage> {
   final _phone = TextEditingController();
   final _repository = TransitRepository();
+  String? _pickupStopId;
   String? _destinationStopId;
+  Future<TripFareQuote>? _fareQuote;
   bool _paying = false;
 
   @override
@@ -34,7 +36,32 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
     super.dispose();
   }
 
-  Future<void> _payAndHold(_Fare fare) async {
+  void _choosePickup(String? value) {
+    setState(() {
+      _pickupStopId = value;
+      _destinationStopId = null;
+      _fareQuote = null;
+    });
+  }
+
+  void _chooseDestination(String? value) {
+    setState(() {
+      _destinationStopId = value;
+      _fareQuote = value == null || _pickupStopId == null
+          ? null
+          : _repository.quoteFare(
+              routeId: widget.routeId,
+              pickupStopId: _pickupStopId!,
+              destinationStopId: value,
+            );
+    });
+  }
+
+  Future<void> _payAndHold() async {
+    if (_pickupStopId == null) {
+      _message('Choose your pickup point.');
+      return;
+    }
     if (_destinationStopId == null) {
       _message('Choose your destination stop.');
       return;
@@ -45,10 +72,13 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
     }
     setState(() => _paying = true);
     try {
+      // Quote again while creating the hold so the saved fare always reflects
+      // the current admin-managed route and its road path.
       final bookingId = await _repository.createSeatHold(
         busId: widget.busId,
         routeId: widget.routeId,
         seats: widget.seats,
+        pickupStopId: _pickupStopId!,
         destinationStopId: _destinationStopId!,
         momoPhone: _phone.text.trim(),
       );
@@ -85,26 +115,31 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final stops = snapshot.data!.docs.toList()
+        final points = snapshot.data!.docs.toList()
           ..sort(
             (a, b) => ((a.data()['order'] as num?)?.toInt() ?? 99999).compareTo(
               (b.data()['order'] as num?)?.toInt() ?? 99999,
             ),
           );
-        if (stops.length < 2) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'This route needs an origin and destination stop before payment is available.',
-              ),
-            ),
-          );
+        final pickups = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        for (var index = 0; index < points.length - 1; index += 1) {
+          final type = points[index].data()['type']?.toString();
+          if (_isRoutePoint(type)) {
+            pickups.add(points[index]);
+          }
         }
-        final fare = _Fare.fromStops(stops, _destinationStopId);
-        final destinations = stops.skip(1).toList();
-        final validDestination = destinations.any(
-          (stop) => stop.id == _destinationStopId,
+        final pickupIndex = points.indexWhere(
+          (point) => point.id == _pickupStopId,
+        );
+        final stops = <QueryDocumentSnapshot<Map<String, dynamic>>>[
+          if (pickupIndex >= 0)
+            for (var index = pickupIndex + 1; index < points.length; index += 1)
+              if (_isRoutePoint(points[index].data()['type']?.toString()))
+                points[index],
+        ];
+        final validPickup = pickups.any((point) => point.id == _pickupStopId);
+        final validDestination = stops.any(
+          (point) => point.id == _destinationStopId,
         );
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
@@ -120,11 +155,39 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Origin: ${stops.first.data()['name'] ?? 'Route origin'}',
+                    const Text(
+                      'Choose where you will board and where you will get off.',
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
+                      key: ValueKey('pickup-${widget.routeId}'),
+                      initialValue: validPickup ? _pickupStopId : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Your boarding point',
+                        prefixIcon: Icon(Icons.my_location_outlined),
+                      ),
+                      items: pickups
+                          .map(
+                            (point) => DropdownMenuItem(
+                              value: point.id,
+                              child: Text(
+                                point.data()['name']?.toString() ??
+                                    'Pickup point',
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _choosePickup,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      // Rebuild the field when pickup changes. This clears an
+                      // invalid previous stop and immediately requests a new
+                      // road-route fare for the next selected pair.
+                      key: ValueKey(
+                        'stop-${widget.routeId}-${_pickupStopId ?? ''}',
+                      ),
                       initialValue: validDestination
                           ? _destinationStopId
                           : null,
@@ -133,18 +196,19 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
                         labelText: 'Your destination stop',
                         prefixIcon: Icon(Icons.location_on_outlined),
                       ),
-                      items: destinations
+                      items: stops
                           .map(
-                            (stop) => DropdownMenuItem(
-                              value: stop.id,
+                            (point) => DropdownMenuItem(
+                              value: point.id,
                               child: Text(
-                                stop.data()['name']?.toString() ?? 'Stop',
+                                point.data()['name']?.toString() ?? 'Stop',
                               ),
                             ),
                           )
                           .toList(),
-                      onChanged: (value) =>
-                          setState(() => _destinationStopId = value),
+                      onChanged: _pickupStopId == null
+                          ? null
+                          : _chooseDestination,
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -160,56 +224,11 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
               ),
             ),
             const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Row(
-                  children: [
-                    const Icon(Icons.account_balance_wallet_outlined),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Admin-set fare',
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          Text(
-                            fare == null
-                                ? 'Select a destination to see the fare.'
-                                : '${fare.distanceKm.toStringAsFixed(1)} km × UGX ${fare.ratePerKm.toInt()} per km',
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      fare == null
-                          ? '—'
-                          : 'UGX ${fare.total * widget.seats.length}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _paying || fare == null
-                  ? null
-                  : () => _payAndHold(fare),
-              icon: const Icon(Icons.lock_outline),
-              label: Text(
-                _paying
-                    ? 'Creating seat hold...'
-                    : 'Pay and hold ${widget.seats.length == 1 ? 'seat' : 'seats'}',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'The fare is set by the administrator for this route. A MoMo payment record is saved with your seat hold.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
+            _FareAndPayment(
+              quote: _fareQuote,
+              seatCount: widget.seats.length,
+              paying: _paying,
+              onPay: _payAndHold,
             ),
           ],
         );
@@ -218,47 +237,92 @@ class _MomoPaymentPageState extends State<MomoPaymentPage> {
   );
 }
 
-class _Fare {
-  const _Fare({
-    required this.ratePerKm,
-    required this.distanceKm,
-    required this.total,
-  });
-  final num ratePerKm;
-  final double distanceKm;
-  final int total;
+bool _isRoutePoint(String? type) {
+  final normalized = type?.trim().toLowerCase();
+  return normalized == 'pickup' ||
+      normalized == 'pickup_point' ||
+      normalized == 'pickup point' ||
+      normalized == 'stop' ||
+      normalized == 'destination' ||
+      normalized == 'both';
+}
 
-  static _Fare? fromStops(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> stops,
-    String? destinationId,
-  ) {
-    final destinationIndex = stops.indexWhere(
-      (stop) => stop.id == destinationId,
-    );
-    if (destinationIndex <= 0) {
-      return null;
-    }
-    final rate = stops.first.data()['farePerKilometre'] as num?;
-    final points = stops.take(destinationIndex + 1).map((stop) {
-      final data = stop.data();
-      final latitude = data['latitude'];
-      final longitude = data['longitude'];
-      return latitude is num && longitude is num
-          ? LatLng(latitude.toDouble(), longitude.toDouble())
+class _FareAndPayment extends StatelessWidget {
+  const _FareAndPayment({
+    required this.quote,
+    required this.seatCount,
+    required this.paying,
+    required this.onPay,
+  });
+
+  final Future<TripFareQuote>? quote;
+  final int seatCount;
+  final bool paying;
+  final VoidCallback onPay;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<TripFareQuote>(
+    future: quote,
+    builder: (context, snapshot) {
+      final quoteValue = snapshot.data;
+      final error = snapshot.hasError
+          ? snapshot.error.toString().replaceFirst('Bad state: ', '')
           : null;
-    }).toList();
-    if (rate == null || rate <= 0 || points.any((point) => point == null)) {
-      return null;
-    }
-    var metres = 0.0;
-    for (var index = 1; index < points.length; index += 1) {
-      metres += const Distance().as(
-        LengthUnit.Meter,
-        points[index - 1]!,
-        points[index]!,
+      return Column(
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Admin-set route fare',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        Text(
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? 'Calculating the road distance…'
+                              : error ??
+                                    (quoteValue == null
+                                        ? 'Select a pickup and stop to see the fare.'
+                                        : '${quoteValue.distanceKm.toStringAsFixed(1)} km on route · fixed for this pickup and stop'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    quoteValue == null
+                        ? '—'
+                        : 'UGX ${quoteValue.farePerSeat * seatCount}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: paying || quoteValue == null ? null : onPay,
+            icon: const Icon(Icons.lock_outline),
+            label: Text(
+              paying
+                  ? 'Creating seat hold...'
+                  : 'Pay and hold ${seatCount == 1 ? 'seat' : 'seats'}',
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'The administrator sets this fare for your selected pickup and stop. Road distance is used for the route and arrival estimate.',
+            textAlign: TextAlign.center,
+          ),
+        ],
       );
-    }
-    final km = metres / 1000;
-    return _Fare(ratePerKm: rate, distanceKm: km, total: (km * rate).round());
-  }
+    },
+  );
 }

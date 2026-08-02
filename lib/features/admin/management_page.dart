@@ -7,6 +7,7 @@ import 'package:smartrideug/firebase/firebase_options.dart';
 enum ManagementKind {
   buses,
   routes,
+  pickups,
   stops,
   drivers,
   admins,
@@ -30,6 +31,7 @@ class _ManagementPageState extends State<ManagementPage> {
   String get _collection => switch (widget.kind) {
     ManagementKind.buses => 'buses',
     ManagementKind.routes => 'routes',
+    ManagementKind.pickups => 'stops',
     ManagementKind.stops => 'stops',
     ManagementKind.drivers => 'users',
     ManagementKind.admins => 'users',
@@ -49,13 +51,19 @@ class _ManagementPageState extends State<ManagementPage> {
       _Field('origin', 'Origin'),
       _Field('destination', 'Destination'),
     ],
-    ManagementKind.stops => const [
+    ManagementKind.pickups => const [
       _Field('routeId', 'Route ID'),
-      _Field('name', 'Stop / pickup name'),
+      _Field('name', 'Pickup point name'),
       _Field('latitude', 'Latitude', numeric: true),
       _Field('longitude', 'Longitude', numeric: true),
-      _Field('order', 'Stop order', numeric: true),
-      _Field('farePerKilometre', 'Fare per kilometre (UGX)', numeric: true),
+      _Field('order', 'Route order', numeric: true),
+    ],
+    ManagementKind.stops => const [
+      _Field('routeId', 'Route ID'),
+      _Field('name', 'Stop name'),
+      _Field('latitude', 'Latitude', numeric: true),
+      _Field('longitude', 'Longitude', numeric: true),
+      _Field('order', 'Route order', numeric: true),
     ],
     ManagementKind.drivers => const [
       _Field('name', 'Driver full name'),
@@ -95,7 +103,11 @@ class _ManagementPageState extends State<ManagementPage> {
     );
     if (values == null) return;
     try {
-      await _save(values, documentId: document?.id);
+      await _save(
+        values,
+        documentId: document?.id,
+        previousValues: document?.data(),
+      );
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -110,7 +122,11 @@ class _ManagementPageState extends State<ManagementPage> {
     }
   }
 
-  Future<void> _save(Map<String, String> values, {String? documentId}) async {
+  Future<void> _save(
+    Map<String, String> values, {
+    String? documentId,
+    Map<String, dynamic>? previousValues,
+  }) async {
     for (final field in _fields) {
       final value = values[field.key]?.trim() ?? '';
       if (value.isEmpty) throw StateError('${field.label} is required.');
@@ -150,17 +166,20 @@ class _ManagementPageState extends State<ManagementPage> {
         });
         await _db.collection('routes').add(data);
         return;
+      case ManagementKind.pickups:
       case ManagementKind.stops:
         final routeId = data['routeId']?.toString() ?? '';
         if (routeId.isEmpty) {
-          throw StateError('Choose a route before adding a stop.');
+          throw StateError('Choose a route before adding this point.');
         }
+        final type = widget.kind == ManagementKind.pickups ? 'pickup' : 'stop';
         final rootStop = documentId == null
             ? _db.collection('stops').doc()
             : _db.collection('stops').doc(documentId);
         final batch = _db.batch();
         batch.set(rootStop, {
           ...data,
+          'type': type,
           'stopId': rootStop.id,
           'updatedAt': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
@@ -173,12 +192,25 @@ class _ManagementPageState extends State<ManagementPage> {
               .doc(rootStop.id),
           {
             ...data,
+            'type': type,
             'stopId': rootStop.id,
             'updatedAt': FieldValue.serverTimestamp(),
             'createdAt': FieldValue.serverTimestamp(),
           },
           SetOptions(merge: documentId != null),
         );
+        final previousRouteId = previousValues?['routeId']?.toString();
+        if (previousRouteId != null &&
+            previousRouteId.isNotEmpty &&
+            previousRouteId != routeId) {
+          batch.delete(
+            _db
+                .collection('routes')
+                .doc(previousRouteId)
+                .collection('stops')
+                .doc(rootStop.id),
+          );
+        }
         await batch.commit();
         return;
       case ManagementKind.drivers:
@@ -280,7 +312,24 @@ class _ManagementPageState extends State<ManagementPage> {
         ],
       ),
     );
-    if (confirmed == true) await document.reference.delete();
+    if (confirmed != true) return;
+    if (widget.kind == ManagementKind.pickups ||
+        widget.kind == ManagementKind.stops) {
+      final routeId = document.data()?['routeId']?.toString();
+      final batch = _db.batch()..delete(document.reference);
+      if (routeId != null && routeId.isNotEmpty) {
+        batch.delete(
+          _db
+              .collection('routes')
+              .doc(routeId)
+              .collection('stops')
+              .doc(document.id),
+        );
+      }
+      await batch.commit();
+      return;
+    }
+    await document.reference.delete();
   }
 
   Future<void> _changeRouteStatus(
@@ -289,6 +338,162 @@ class _ManagementPageState extends State<ManagementPage> {
     'active': document.data()?['active'] != true,
     'updatedAt': FieldValue.serverTimestamp(),
   });
+
+  Future<void> _createReverseRoute(
+    DocumentSnapshot<Map<String, dynamic>> document,
+  ) async {
+    final source = document.data() ?? const <String, dynamic>{};
+    final origin = source['origin']?.toString().trim() ?? '';
+    final destination = source['destination']?.toString().trim() ?? '';
+    if (origin.isEmpty || destination.isEmpty) {
+      throw StateError('Give this route an origin and destination first.');
+    }
+    final existingReverseId = source['reverseRouteId']?.toString();
+    if (existingReverseId != null && existingReverseId.isNotEmpty) {
+      final existingReverse = await _db
+          .collection('routes')
+          .doc(existingReverseId)
+          .get();
+      if (existingReverse.exists) {
+        throw StateError('This route already has a return route.');
+      }
+    }
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create return route?'),
+        content: Text(
+          'This creates $destination → $origin, reverses all route points, and copies each fixed pickup-to-stop fare for the return journey.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Create return route'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final sourceStops =
+        (await document.reference.collection('stops').get()).docs..sort(
+          (a, b) => ((a.data()['order'] as num?)?.toInt() ?? 99999).compareTo(
+            (b.data()['order'] as num?)?.toInt() ?? 99999,
+          ),
+        );
+    if (sourceStops.length < 2) {
+      throw StateError(
+        'Add at least a pickup point and stop before reversing.',
+      );
+    }
+    for (final stop in sourceStops) {
+      final data = stop.data();
+      final name = data['name']?.toString().trim() ?? '';
+      if (name.isEmpty ||
+          data['latitude'] is! num ||
+          data['longitude'] is! num ||
+          !{'pickup', 'stop', 'both'}.contains(data['type']?.toString())) {
+        throw StateError(
+          'Every route point needs a name, type, and coordinates.',
+        );
+      }
+    }
+    final sourceFares =
+        (await _db
+                .collection('fares')
+                .where('routeId', isEqualTo: document.id)
+                .get())
+            .docs;
+    if (sourceStops.length * 2 + sourceFares.length + 2 > 450) {
+      throw StateError('This route is too large to reverse in one operation.');
+    }
+
+    final reverseRoute = _db.collection('routes').doc();
+    final reverseStops = <String, DocumentReference<Map<String, dynamic>>>{
+      for (final stop in sourceStops) stop.id: _db.collection('stops').doc(),
+    };
+    final batch = _db.batch();
+    batch.set(reverseRoute, {
+      'name': '$destination → $origin',
+      'origin': destination,
+      'destination': origin,
+      'active': source['active'] != false,
+      'reverseOfRouteId': document.id,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(document.reference, {
+      'reverseRouteId': reverseRoute.id,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    for (var order = 0; order < sourceStops.length; order += 1) {
+      final sourceStop = sourceStops[sourceStops.length - 1 - order];
+      final sourceData = sourceStop.data();
+      final rootStop = reverseStops[sourceStop.id]!;
+      final point = <String, dynamic>{
+        'routeId': reverseRoute.id,
+        'stopId': rootStop.id,
+        'name': sourceData['name']?.toString().trim(),
+        'type': sourceData['type'] == 'both'
+            ? 'both'
+            : sourceData['type'] == 'pickup'
+            ? 'stop'
+            : 'pickup',
+        'latitude': sourceData['latitude'],
+        'longitude': sourceData['longitude'],
+        'order': order,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      batch.set(rootStop, point);
+      batch.set(reverseRoute.collection('stops').doc(rootStop.id), point);
+    }
+    for (final sourceFare in sourceFares) {
+      final data = sourceFare.data();
+      final sourcePickupId = data['pickupStopId']?.toString();
+      final sourceDestinationId = data['destinationStopId']?.toString();
+      final fare = data['farePerSeat'];
+      final reversePickup = sourceDestinationId == null
+          ? null
+          : reverseStops[sourceDestinationId];
+      final reverseDestination = sourcePickupId == null
+          ? null
+          : reverseStops[sourcePickupId];
+      if (reversePickup == null || reverseDestination == null || fare is! num) {
+        continue;
+      }
+      final farePerSeat = fare.round();
+      if (farePerSeat <= 0) continue;
+      final reverseFareId =
+          '${reverseRoute.id}_${reversePickup.id}_${reverseDestination.id}';
+      batch.set(_db.collection('fares').doc(reverseFareId), {
+        'routeId': reverseRoute.id,
+        'routeName': '$destination → $origin',
+        'pickupStopId': reversePickup.id,
+        'pickupStopName':
+            data['destinationStopName']?.toString() ?? 'Pickup point',
+        'destinationStopId': reverseDestination.id,
+        'destinationStopName': data['pickupStopName']?.toString() ?? 'Stop',
+        'farePerSeat': farePerSeat,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Return route created. Assign another bus to it.'),
+        ),
+      );
+    }
+  }
 
   Future<void> _assignDriver(
     DocumentSnapshot<Map<String, dynamic>> driver, {
@@ -489,6 +694,15 @@ class _ManagementPageState extends State<ManagementPage> {
               .where((item) => item.data()['role'] == role)
               .toList();
         }
+        if (widget.kind == ManagementKind.pickups ||
+            widget.kind == ManagementKind.stops) {
+          final type = widget.kind == ManagementKind.pickups
+              ? 'pickup'
+              : 'stop';
+          documents = documents
+              .where((item) => item.data()['type']?.toString() == type)
+              .toList();
+        }
         if (documents.isEmpty) {
           final hint = switch (widget.kind) {
             ManagementKind.drivers =>
@@ -529,6 +743,8 @@ class _ManagementPageState extends State<ManagementPage> {
                     )
                   : widget.kind == ManagementKind.buses ||
                         widget.kind == ManagementKind.routes ||
+                        widget.kind == ManagementKind.pickups ||
+                        widget.kind == ManagementKind.stops ||
                         widget.kind == ManagementKind.helpSupport
                   ? PopupMenuButton<_RecordAction>(
                       onSelected: (action) async {
@@ -539,6 +755,12 @@ class _ManagementPageState extends State<ManagementPage> {
                         } else if (action == _RecordAction.assign) {
                           try {
                             await _assignBus(document);
+                          } catch (error) {
+                            _showAssignmentError(error);
+                          }
+                        } else if (action == _RecordAction.reverse) {
+                          try {
+                            await _createReverseRoute(document);
                           } catch (error) {
                             _showAssignmentError(error);
                           }
@@ -555,6 +777,11 @@ class _ManagementPageState extends State<ManagementPage> {
                           const PopupMenuItem(
                             value: _RecordAction.assign,
                             child: Text('Assign route and driver'),
+                          ),
+                        if (widget.kind == ManagementKind.routes)
+                          const PopupMenuItem(
+                            value: _RecordAction.reverse,
+                            child: Text('Create return route'),
                           ),
                         if (widget.kind == ManagementKind.routes)
                           PopupMenuItem(
@@ -580,6 +807,7 @@ class _ManagementPageState extends State<ManagementPage> {
   IconData get _icon => switch (widget.kind) {
     ManagementKind.buses => Icons.directions_bus_outlined,
     ManagementKind.routes => Icons.route_outlined,
+    ManagementKind.pickups => Icons.my_location_outlined,
     ManagementKind.stops => Icons.place_outlined,
     ManagementKind.drivers => Icons.badge_outlined,
     ManagementKind.admins => Icons.admin_panel_settings_outlined,
@@ -609,7 +837,7 @@ class _ManagementPageState extends State<ManagementPage> {
       .join(' • ');
 }
 
-enum _RecordAction { edit, assign, status, delete }
+enum _RecordAction { edit, assign, reverse, status, delete }
 
 class _Field {
   const _Field(
