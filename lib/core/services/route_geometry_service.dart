@@ -153,6 +153,7 @@ class RouteGeometryService {
       id: id,
       name: data['name']?.toString() ?? 'Stop',
       position: point,
+      type: data['type']?.toString().trim().toLowerCase() ?? 'stop',
     );
   }
 
@@ -251,8 +252,10 @@ class RouteStop {
     required this.id,
     required this.name,
     required this.position,
+    required this.type,
   });
   final String id;
   final String name;
   final LatLng position;
+  final String type;
 }

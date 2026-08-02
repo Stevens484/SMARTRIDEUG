@@ -127,17 +127,24 @@ class _ManagementPageState extends State<ManagementPage> {
     String? documentId,
     Map<String, dynamic>? previousValues,
   }) async {
+    final numericValues = <String, num>{};
     for (final field in _fields) {
       final value = values[field.key]?.trim() ?? '';
       if (value.isEmpty) throw StateError('${field.label} is required.');
-      if (field.numeric && num.tryParse(value) == null) {
-        throw StateError('${field.label} must be a number.');
+      if (field.numeric) {
+        final number = _parseNumber(value);
+        if (number == null) {
+          throw StateError(
+            '${field.label} must be a decimal number, for example 0.318005.',
+          );
+        }
+        numericValues[field.key] = number;
       }
     }
     final data = <String, dynamic>{
       for (final field in _fields)
         field.key: field.numeric
-            ? num.tryParse(values[field.key]!.trim())
+            ? numericValues[field.key]
             : values[field.key]!.trim(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -199,6 +206,9 @@ class _ManagementPageState extends State<ManagementPage> {
           },
           SetOptions(merge: documentId != null),
         );
+        batch.set(_db.collection('routes').doc(routeId), {
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
         final previousRouteId = previousValues?['routeId']?.toString();
         if (previousRouteId != null &&
             previousRouteId.isNotEmpty &&
@@ -278,6 +288,18 @@ class _ManagementPageState extends State<ManagementPage> {
         }, SetOptions(merge: true));
         return;
     }
+  }
+
+  /// Accepts decimal degrees pasted from common map apps, including a comma
+  /// decimal separator and an optional degree symbol or N/S/E/W suffix.
+  num? _parseNumber(String value) {
+    var normalized = value
+        .trim()
+        .replaceAll('\u00a0', '')
+        .replaceAll('−', '-')
+        .replaceAll(',', '.');
+    normalized = normalized.replaceAll(RegExp(r'[^0-9+\-.]'), '');
+    return num.tryParse(normalized);
   }
 
   Future<FirebaseApp> _provisioningApp() async {
@@ -920,7 +942,14 @@ class _EntryFormState extends State<_EntryForm> {
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
         maxLines: field.multiline ? 3 : 1,
-        decoration: InputDecoration(labelText: field.label),
+        decoration: InputDecoration(
+          labelText: field.label,
+          helperText: field.key == 'latitude'
+              ? 'Example: 0.318005'
+              : field.key == 'longitude'
+              ? 'Example: 32.592309'
+              : null,
+        ),
       );
     }
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
