@@ -103,14 +103,7 @@ class _DriverTripMapPanelState extends State<DriverTripMapPanel> {
                 AppTheme.orange,
                 'Route destination',
               ),
-              ...geometry.stops.map(
-                (stop) => _iconMarker(
-                  stop.position,
-                  Icons.location_on_rounded,
-                  AppTheme.navy,
-                  stop.name,
-                ),
-              ),
+              ...geometry.stops.map(_routePointMarker),
               if (busPosition != null)
                 _iconMarker(
                   busPosition,
@@ -293,6 +286,32 @@ class _DriverTripMapPanelState extends State<DriverTripMapPanel> {
           ),
         ),
       );
+
+  Marker _routePointMarker(RouteStop stop) {
+    final isPickup =
+        stop.type == 'pickup' ||
+        stop.type == 'pickup_point' ||
+        stop.type == 'pickup point';
+    final isBoth = stop.type == 'both';
+    return _iconMarker(
+      stop.position,
+      isPickup
+          ? Icons.my_location_rounded
+          : isBoth
+          ? Icons.swap_vert_rounded
+          : Icons.location_on_rounded,
+      isPickup
+          ? AppTheme.success
+          : isBoth
+          ? const Color(0xFF2878E8)
+          : AppTheme.navy,
+      '${isPickup
+          ? 'Pickup'
+          : isBoth
+          ? 'Pickup & stop'
+          : 'Stop'}: ${stop.name}',
+    );
+  }
 
   void _fit(RouteGeometry geometry) {
     if (_fitted || geometry.points.isEmpty) return;

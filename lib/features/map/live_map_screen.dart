@@ -142,6 +142,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => _BusInfoSheet(busId: busId, liveData: data),
     );
@@ -269,15 +270,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   route.color,
                   '${route.name} destination',
                 ),
-                ...route.geometry.stops.map(
-                  (stop) => _routeEndpoint(
-                    stop.position,
-                    Icons.circle,
-                    route.color,
-                    stop.name,
-                    size: 28,
-                  ),
-                ),
+                ...route.geometry.stops.map(_routePointMarker),
               ],
             ),
             ...buses.entries.map((entry) {
@@ -329,6 +322,33 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       ),
     ),
   );
+
+  Marker _routePointMarker(RouteStop stop) {
+    final isPickup =
+        stop.type == 'pickup' ||
+        stop.type == 'pickup_point' ||
+        stop.type == 'pickup point';
+    final isBoth = stop.type == 'both';
+    return _routeEndpoint(
+      stop.position,
+      isPickup
+          ? Icons.my_location_rounded
+          : isBoth
+          ? Icons.swap_vert_rounded
+          : Icons.location_on_rounded,
+      isPickup
+          ? AppTheme.success
+          : isBoth
+          ? const Color(0xFF2878E8)
+          : AppTheme.navy,
+      '${isPickup
+          ? 'Pickup'
+          : isBoth
+          ? 'Pickup & stop'
+          : 'Stop'}: ${stop.name}',
+      size: 34,
+    );
+  }
 
   Marker _busMarker({
     required String busId,
@@ -486,8 +506,13 @@ class _BusInfoSheet extends StatelessWidget {
           final seats =
               data['availableSeats']?.toString() ?? 'Seat availability pending';
           return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                4,
+                20,
+                24 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

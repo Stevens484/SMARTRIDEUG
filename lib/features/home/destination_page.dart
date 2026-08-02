@@ -1,13 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:smartrideug/features/home/route_details_page.dart';
 
-<<<<<<< HEAD
-=======
 /// Finds active routes by destination and combines them with the live vehicle
 /// feed. Both streams stay open, so the matching route and its buses update
 /// without the passenger searching again.
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
 class DestinationPage extends StatefulWidget {
   const DestinationPage({super.key});
 
@@ -16,301 +14,20 @@ class DestinationPage extends StatefulWidget {
   @override
   State<DestinationPage> createState() => _DestinationPageState();
 }
-<<<<<<< HEAD
-
-class _DestinationPageState extends State<DestinationPage> {
-  String _searchQuery = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(
-      context,
-    ).padding.bottom; // 🔥 Get system bottom padding
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: const Text('Choose Destination'), elevation: 0),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Search Bar
-              TextField(
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: 'Search destination...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
-                ),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
-              ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value.trim().toLowerCase());
-              },
-            ),
-            const SizedBox(height: 16),
-
-              // 🔥 Routes List (Expanded = takes all remaining space)
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('routes')
-                      .where('active', isEqualTo: true)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: Colors.red[300],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Failed to load routes',
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: () => setState(() {}),
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    final routes = snapshot.data!.docs;
-
-                    final filteredRoutes = _searchQuery.isEmpty
-                        ? routes
-                        : routes.where((route) {
-                            final data = route.data();
-                            final name =
-                                data['name']?.toString().toLowerCase() ?? '';
-                            final origin =
-                                data['origin']?.toString().toLowerCase() ?? '';
-                            final destination =
-                                data['destination']?.toString().toLowerCase() ??
-                                '';
-                            return name.contains(_searchQuery) ||
-                                origin.contains(_searchQuery) ||
-                                destination.contains(_searchQuery);
-                          }).toList();
-
-                    if (filteredRoutes.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'No active routes available'
-                                  : 'No routes match "$_searchQuery"',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'Check back later for new routes'
-                                  : 'Try a different search term',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () => setState(() {}),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final routes = snapshot.data!.docs;
-
-                // 🔥 Filter routes based on search query
-                final filteredRoutes =
-                    routes.where((route) {
-                      final data = route.data();
-                      if (data['active'] == false || data['disabled'] == true) {
-                        return false;
-                      }
-                      return _searchQuery.isEmpty ||
-                          _matchesDestination(data, _searchQuery);
-                    }).toList()..sort(
-                      (a, b) =>
-                          _matchRank(a.data()).compareTo(_matchRank(b.data())),
-                    );
-
-                if (filteredRoutes.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isEmpty
-                              ? 'No routes available'
-                              : 'No routes travel to "$_searchQuery"',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _searchQuery.isEmpty
-                              ? 'Check back later for new routes'
-                              : 'Try a nearby destination, route name, or code',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredRoutes.length,
-                  itemBuilder: (context, index) {
-                    final route = filteredRoutes[index];
-                    final data = route.data();
-                    final title = data['name']?.toString() ?? route.id;
-                    final subtitle =
-                        data['subtitle']?.toString() ??
-                        [
-                          data['origin'],
-                          data['destination'],
-                        ].whereType<String>().join(' → ');
-                    final distance = data['distance']?.toString() ?? 'Unknown';
-                    final duration = data['duration']?.toString() ?? 'Unknown';
-                    return _RouteCard(
-                      routeId: route.id,
-                      title: title,
-                      subtitle: subtitle,
-                      distance: distance,
-                      duration: duration,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => RouteDetailsPage(routeId: route.id),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            // 🔥 Info Card
-            Card(
-              elevation: 0,
-              color: Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Live updates: Bus locations and seat availability are updated in real time.',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // 🔥 FIX: Added bottom padding to prevent overflow
-              Padding(
-                padding: EdgeInsets.only(bottom: bottomPadding + 8),
-                child: Card(
-                  elevation: 0,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer.withValues(alpha: 0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Live updates: Bus locations and seat availability are updated in real time.',
-                            style: TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-=======
 
 class _DestinationPageState extends State<DestinationPage> {
   final _search = TextEditingController();
   String _query = '';
+  Position? _position;
+  bool _locating = true;
+
+  static const _nearbyRouteMetres = 2500.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentLocation();
+  }
 
   @override
   void dispose() {
@@ -318,12 +35,60 @@ class _DestinationPageState extends State<DestinationPage> {
     super.dispose();
   }
 
+  Future<void> _loadCurrentLocation() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
+      );
+      if (mounted) setState(() => _position = position);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Choose destination'), elevation: 0),
+    appBar: AppBar(
+      title: const Text('Choose destination'),
+      elevation: 0,
+      actions: [
+        IconButton(
+          tooltip: 'Update location',
+          icon: const Icon(Icons.my_location_outlined),
+          onPressed: _locating
+              ? null
+              : () {
+                  setState(() => _locating = true);
+                  _loadCurrentLocation();
+                },
+        ),
+      ],
+    ),
     body: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                  MediaQuery.orientationOf(context) == Orientation.landscape
+              ? 4
+              : 16,
+          16,
+          MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                  MediaQuery.orientationOf(context) == Orientation.landscape
+              ? 4
+              : 16,
+        ),
         child: Column(
           children: [
             TextField(
@@ -346,7 +111,13 @@ class _DestinationPageState extends State<DestinationPage> {
                 hintText: 'Type a destination, e.g. Ntinda',
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(
+              height:
+                  MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                      MediaQuery.orientationOf(context) == Orientation.landscape
+                  ? 4
+                  : 16,
+            ),
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
@@ -360,7 +131,11 @@ class _DestinationPageState extends State<DestinationPage> {
                   if (!routeSnapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final matchingRoutes = routeSnapshot.data!.docs
+                  final routeDocuments = routeSnapshot.data?.docs;
+                  if (routeDocuments == null) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final matchingRoutes = routeDocuments
                       .where((route) => _matchesDestination(route.data()))
                       .toList();
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -389,56 +164,109 @@ class _DestinationPageState extends State<DestinationPage> {
                               : 'No active route goes to “${_search.text.trim()}”.',
                         );
                       }
-                      return ListView(
-                        children: [
-                          Text(
-                            _query.isEmpty
-                                ? 'Available routes'
-                                : 'Routes to ${_search.text.trim()}',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          ...matchingRoutes.map(
-                            (route) => _RouteCard(
-                              route: route,
-                              buses: buses
-                                  .where(
-                                    (bus) =>
-                                        bus.data()['routeId']?.toString() ==
-                                        route.id,
-                                  )
-                                  .toList(),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      RouteDetailsPage(routeId: route.id),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.sync_rounded,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collectionGroup('stops')
+                            .snapshots(),
+                        builder: (context, stopSnapshot) {
+                          if (stopSnapshot.hasError) {
+                            return _message(
+                              'Route points could not be loaded.',
+                            );
+                          }
+                          if (!stopSnapshot.hasData) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          final stopDocuments = stopSnapshot.data?.docs;
+                          if (stopDocuments == null) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          final distances = _nearbyRouteDistances(
+                            matchingRoutes,
+                            stopDocuments,
+                          );
+                          final nearbyRoutes = [...matchingRoutes];
+                          if (_position != null) {
+                            nearbyRoutes.removeWhere(
+                              (route) => !distances.containsKey(route.id),
+                            );
+                            nearbyRoutes.sort(
+                              (a, b) => (distances[a.id] ?? double.infinity)
+                                  .compareTo(
+                                    distances[b.id] ?? double.infinity,
                                   ),
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Routes and buses update automatically as drivers go online or move.',
+                            );
+                          }
+                          if (_position != null && nearbyRoutes.isEmpty) {
+                            return _message(
+                              'No route passes within 2.5 km of your current location.',
+                            );
+                          }
+                          return ListView(
+                            children: [
+                              Text(
+                                _position == null
+                                    ? _locating
+                                          ? 'Finding routes near you…'
+                                          : _query.isEmpty
+                                          ? 'Available routes'
+                                          : 'Routes to ${_search.text.trim()}'
+                                    : _query.isEmpty
+                                    ? 'Routes near you'
+                                    : 'Routes near you to ${_search.text.trim()}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              ...nearbyRoutes.map(
+                                (route) => _RouteCard(
+                                  route: route,
+                                  distanceMetres: distances[route.id],
+                                  buses: buses
+                                      .where(
+                                        (bus) =>
+                                            bus.data()['routeId']?.toString() ==
+                                            route.id,
+                                      )
+                                      .toList(),
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          RouteDetailsPage(routeId: route.id),
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
+                              const SizedBox(height: 16),
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.my_location_outlined,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _position == null
+                                              ? 'Allow location access to see routes that pass near you.'
+                                              : 'Showing routes with a stop within 2.5 km of you.',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   );
@@ -446,7 +274,6 @@ class _DestinationPageState extends State<DestinationPage> {
               ),
             ),
           ],
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
       ),
     ),
@@ -460,6 +287,40 @@ class _DestinationPageState extends State<DestinationPage> {
     return destination.contains(_query);
   }
 
+  Map<String, double> _nearbyRouteDistances(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> routes,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> stops,
+  ) {
+    final position = _position;
+    if (position == null) return const {};
+    final routeIds = routes.map((route) => route.id).toSet();
+    final distances = <String, double>{};
+    for (final stop in stops) {
+      final data = stop.data();
+      final routeId = data['routeId']?.toString();
+      final latitude = data['latitude'] ?? data['lat'];
+      final longitude = data['longitude'] ?? data['lng'];
+      if (routeId == null ||
+          !routeIds.contains(routeId) ||
+          latitude is! num ||
+          longitude is! num) {
+        continue;
+      }
+      final distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        latitude.toDouble(),
+        longitude.toDouble(),
+      );
+      if (distance > _nearbyRouteMetres) continue;
+      final previous = distances[routeId];
+      if (previous == null || distance < previous) {
+        distances[routeId] = distance;
+      }
+    }
+    return distances;
+  }
+
   Widget _message(String message) => Center(
     child: Padding(
       padding: const EdgeInsets.all(24),
@@ -471,27 +332,18 @@ class _DestinationPageState extends State<DestinationPage> {
 class _RouteCard extends StatelessWidget {
   const _RouteCard({
     required this.route,
+    this.distanceMetres,
     required this.buses,
     required this.onTap,
   });
 
   final QueryDocumentSnapshot<Map<String, dynamic>> route;
+  final double? distanceMetres;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> buses;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-=======
     final data = route.data();
     final destination =
         data['destination']?.toString() ?? 'Destination unavailable';
@@ -503,128 +355,11 @@ class _RouteCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-<<<<<<< HEAD
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Text(
-                    title.split(' ').last,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // 🔥 Route Details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.place,
-                              size: 14,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              distance,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Icon(
-                              Icons.access_time,
-                              size: 14,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              duration,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: busesAvailable > 0
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : Colors.grey.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$busesAvailable buses',
-                      style: TextStyle(
-                        color: busesAvailable > 0 ? Colors.green : Colors.grey,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
-=======
               Row(
                 children: [
                   Container(
@@ -654,7 +389,6 @@ class _RouteCard extends StatelessWidget {
                     ),
                   ),
                   const Icon(Icons.chevron_right_rounded),
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                 ],
               ),
               const SizedBox(height: 14),
@@ -664,6 +398,15 @@ class _RouteCard extends StatelessWidget {
                     : '${buses.length} live ${buses.length == 1 ? 'bus' : 'buses'} on this route',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (distanceMetres != null) ...[
+                const SizedBox(height: 5),
+                Text(
+                  distanceMetres! < 1000
+                      ? '${distanceMetres!.round()} m from your nearest route point'
+                      : '${(distanceMetres! / 1000).toStringAsFixed(1)} km from your nearest route point',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               if (buses.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Wrap(
@@ -676,8 +419,8 @@ class _RouteCard extends StatelessWidget {
               ],
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

@@ -16,148 +16,41 @@ class SeatReservationsPage extends StatelessWidget {
       );
     }
     return Scaffold(
-<<<<<<< HEAD
-      appBar: AppBar(title: const Text('Seat Reservations'), elevation: 0),
-=======
       appBar: AppBar(title: const Text('Seat reservations')),
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('bookings')
-            // 🔥 FIX: Changed 'passengerId' to 'userId'
-            .where('userId', isEqualTo: uid)
-            .orderBy('createdAt', descending: true)
+            .where('passengerId', isEqualTo: uid)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('Could not load your reservations.'),
+            );
+          }
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-<<<<<<< HEAD
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error loading reservations: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event_seat, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'No seat reservations found.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Book a seat from the live map to get started!',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final reservations = snapshot.data!.docs;
-=======
-          final reservations = snapshot.data!.docs;
+          final reservations = snapshot.data!.docs.toList()
+            ..sort((a, b) {
+              final aCreatedAt = a.data()['createdAt'];
+              final bCreatedAt = b.data()['createdAt'];
+              final aDate = aCreatedAt is Timestamp
+                  ? aCreatedAt.toDate()
+                  : DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate = bCreatedAt is Timestamp
+                  ? bCreatedAt.toDate()
+                  : DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            });
           if (reservations.isEmpty) {
             return const Center(child: Text('No seat reservations found.'));
           }
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: reservations.length,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-<<<<<<< HEAD
-              final data = reservations[index].data();
-              final docId = reservations[index].id;
-              final route = data['routeName']?.toString() ?? 'Unknown route';
-              final bus = data['busId']?.toString() ?? 'Unknown bus';
-              final seats = data['seat']?.toString() ?? 'Unknown';
-              final status = data['status']?.toString() ?? 'Unknown';
-
-              Color statusColor;
-              switch (status) {
-                case 'confirmed':
-                  statusColor = Colors.green;
-                  break;
-                case 'pending':
-                  statusColor = Colors.orange;
-                  break;
-                case 'cancelled':
-                  statusColor = Colors.red;
-                  break;
-                default:
-                  statusColor = Colors.grey;
-              }
-
-              return Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BookingStatusPage(bookingId: docId),
-                    ),
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                route,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                status.toUpperCase(),
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text('Bus: $bus'),
-                        const SizedBox(height: 4),
-                        Text('Seat: $seats'),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tap to view details',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 12,
-                          ),
-=======
               final reservation = reservations[index].data();
               final routeName = reservation['routeName']?.toString();
               final route = routeName?.isNotEmpty == true
@@ -197,13 +90,21 @@ class SeatReservationsPage extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
-                        Text('Bus $bus • Seat(s) $seats'),
+                        Text('Bus $bus • Held seat(s): $seats'),
                         const SizedBox(height: 8),
                         Chip(
-                          label: Text(status.toUpperCase()),
+                          avatar: Icon(
+                            status == 'held'
+                                ? Icons.lock_clock_outlined
+                                : status == 'confirmed'
+                                ? Icons.check_circle_outline
+                                : Icons.info_outline,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          label: Text('Seat status: ${status.toUpperCase()}'),
                           backgroundColor: color,
                           labelStyle: const TextStyle(color: Colors.white),
->>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                         ),
                       ],
                     ),

@@ -186,14 +186,7 @@ class _RouteMapPanelState extends State<RouteMapPanel> {
                 AppTheme.orange,
                 'Destination',
               ),
-              ...geometry.stops.map(
-                (stop) => _marker(
-                  stop.position,
-                  Icons.location_on_rounded,
-                  AppTheme.navy,
-                  stop.name,
-                ),
-              ),
+              ...geometry.stops.map(_routePointMarker),
               ...widget.buses.map((bus) {
                 final data = bus.data();
                 final latitude = data['currentLatitude'] ?? data['latitude'];
@@ -244,6 +237,79 @@ class _RouteMapPanelState extends State<RouteMapPanel> {
           ),
         ),
       );
+
+  Marker _routePointMarker(RouteStop stop) {
+    final type = stop.type;
+    final isPickup =
+        type == 'pickup' || type == 'pickup_point' || type == 'pickup point';
+    final isBoth = type == 'both';
+    final color = isPickup
+        ? AppTheme.success
+        : isBoth
+        ? const Color(0xFF2878E8)
+        : AppTheme.navy;
+    final icon = isPickup
+        ? Icons.my_location_rounded
+        : isBoth
+        ? Icons.swap_vert_rounded
+        : Icons.location_on_rounded;
+    final label = isPickup
+        ? 'Pickup: ${stop.name}'
+        : isBoth
+        ? 'Pickup & stop: ${stop.name}'
+        : 'Stop: ${stop.name}';
+    return Marker(
+      point: stop.position,
+      width: 122,
+      height: 64,
+      child: Tooltip(
+        message: label,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x33000000), blurRadius: 4),
+                ],
+              ),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+            const SizedBox(height: 2),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .92),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                child: Text(
+                  '${isPickup
+                      ? 'Pickup'
+                      : isBoth
+                      ? 'Pickup/stop'
+                      : 'Stop'}: ${stop.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF0F2345),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Marker _busMarker(
     LatLng point,

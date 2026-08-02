@@ -994,52 +994,41 @@ class _NoActiveRide extends StatelessWidget {
   final VoidCallback onFindBus;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
     decoration: _cardDecoration(context),
-    child: Row(
+    child: ExpansionTile(
+      leading: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEDD5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(
+          Icons.directions_bus_rounded,
+          color: AppTheme.orange,
+          size: 32,
+        ),
+      ),
+      title: const Text(
+        'Active rides',
+        style: TextStyle(
+          color: Color(0xFF0F2345),
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      subtitle: const Text('Tap to see available buses and their routes.'),
       children: [
-        Container(
-          width: 62,
-          height: 62,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFEDD5),
-            borderRadius: BorderRadius.circular(16),
+        const _AvailableActiveBuses(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: onFindBus,
+              child: const Text('Find a bus'),
+            ),
           ),
-          child: const Icon(
-            Icons.directions_bus_rounded,
-            color: AppTheme.orange,
-            size: 37,
-          ),
-        ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'No active ride',
-                style: TextStyle(
-                  color: Color(0xFF0F2345),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Find a bus and reserve your seat.',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton(
-          onPressed: onFindBus,
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-          ),
-          child: const Text('Find a Bus'),
         ),
       ],
     ),
@@ -1051,43 +1040,107 @@ class _RideSummary extends StatelessWidget {
   final Map<String, dynamic> booking;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
     decoration: _cardDecoration(context),
-    child: Row(
-      children: [
-        const Icon(
-          Icons.directions_bus_rounded,
-          color: AppTheme.orange,
-          size: 42,
+    child: ExpansionTile(
+      leading: const Icon(
+        Icons.directions_bus_rounded,
+        color: AppTheme.orange,
+        size: 38,
+      ),
+      title: const Text(
+        'Active ride',
+        style: TextStyle(
+          color: Color(0xFF0F2345),
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Active ride',
-                style: TextStyle(
-                  color: Color(0xFF0F2345),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                (booking['destination'] ??
-                        booking['routeName'] ??
-                        'Your booked journey')
-                    .toString(),
-                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B7280)),
-      ],
+      ),
+      subtitle: Text(
+        (booking['destination'] ??
+                booking['routeName'] ??
+                'Your booked journey')
+            .toString(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      children: const [_AvailableActiveBuses()],
     ),
+  );
+}
+
+class _AvailableActiveBuses extends StatelessWidget {
+  const _AvailableActiveBuses();
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('busLocations')
+        .where(
+          'status',
+          whereIn: const [
+            'online',
+            'moving',
+            'approaching_stop',
+            'stopped',
+            'active',
+            'on_route',
+          ],
+        )
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Available buses could not be loaded.'),
+        );
+      }
+      if (!snapshot.hasData) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      final buses = snapshot.data!.docs.where((bus) {
+        final data = bus.data();
+        final seats = data['availableSeats'];
+        return data['disabled'] != true && (seats is! num || seats > 0);
+      }).toList();
+      if (buses.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('No buses with seats available are active right now.'),
+        );
+      }
+      return ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        itemCount: buses.length,
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final data = buses[index].data();
+          final bus = data['plateNumber']?.toString().isNotEmpty == true
+              ? data['plateNumber'].toString()
+              : data['busNumber']?.toString() ?? 'Bus';
+          final route = data['routeName']?.toString().trim();
+          final road = route == null || route.isEmpty
+              ? '${data['origin'] ?? 'Route origin'} → ${data['destination'] ?? 'Route destination'}'
+              : route;
+          final seats = data['availableSeats'] as num?;
+          return ListTile(
+            leading: const Icon(Icons.directions_bus_rounded),
+            title: Text(bus),
+            subtitle: Text('Road: $road'),
+            trailing: Text(
+              seats == null ? 'Seats…' : '${seats.toInt()} seats',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          );
+        },
+      );
+    },
   );
 }
 
