@@ -204,4 +204,123 @@ class BookingConfirmedPage extends StatelessWidget {
       ],
     ),
   );
+
+  static Widget _line(
+    IconData icon,
+    String label,
+    String value, {
+    bool emphasized = false,
+  }) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: AppTheme.grey500),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: const TextStyle(color: AppTheme.grey500, fontSize: 13),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: emphasized ? AppTheme.primary : AppTheme.navy,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TicketHero extends StatelessWidget {
+  const _TicketHero();
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [AppTheme.navy, AppTheme.navyLight],
+      ),
+      borderRadius: BorderRadius.circular(22),
+    ),
+    child: const Row(
+      children: [
+        CircleAvatar(
+          backgroundColor: AppTheme.primary,
+          child: Icon(Icons.airplane_ticket_outlined, color: Colors.white),
+        ),
+        SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your trip is confirmed',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Have a safe and comfortable journey.',
+                style: TextStyle(color: Color(0xFFD5E0F0), fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TicketNotchDivider extends StatelessWidget {
+  const _TicketNotchDivider();
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      SizedBox(
+        width: 12,
+        height: 24,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppTheme.grey50,
+            borderRadius: BorderRadius.horizontal(right: Radius.circular(14)),
+          ),
+        ),
+      ),
+      Expanded(child: DashedLine()),
+      SizedBox(
+        width: 12,
+        height: 24,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppTheme.grey50,
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(14)),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class DashedLine extends StatelessWidget {
+  const DashedLine({super.key});
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (_, constraints) => Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(
+        (constraints.maxWidth / 8).floor(),
+        (_) =>
+            const SizedBox(width: 4, child: Divider(color: AppTheme.grey300)),
+      ),
+    ),
+  );
 }

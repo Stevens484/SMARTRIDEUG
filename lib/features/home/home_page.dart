@@ -18,6 +18,7 @@ import 'package:smartrideug/features/home/destination_page.dart';
 import 'package:smartrideug/features/home/help_support_page.dart';
 import 'package:smartrideug/features/home/payment_method_page.dart';
 import 'package:smartrideug/features/home/saved_places_page.dart';
+import 'package:smartrideug/features/home/booking_status_page.dart';
 import 'package:smartrideug/features/home/seat_reservations_page.dart';
 import 'package:smartrideug/features/home/settings_page.dart';
 import 'package:smartrideug/features/home/modern_home_content.dart';
@@ -47,7 +48,6 @@ class _HomePageState extends State<HomePage> {
     'Smart Ride',
     'My Bookings',
     'Scan',
-    'Notifications',
     'Profile',
   ];
 =======
@@ -198,11 +198,7 @@ class _HomePageState extends State<HomePage> {
                   _handleGuestAction('bookings');
                   return;
                 }
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const SeatReservationsPage(),
-                  ),
-                );
+                setState(() => _selectedIndex = 1);
               },
             ),
             ListTile(
@@ -303,7 +299,10 @@ class _HomePageState extends State<HomePage> {
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            _HomeContent(guestMode: widget.guestMode),
+            HomeDashboard(
+              guestMode: widget.guestMode,
+              onGuestAction: _handleGuestAction,
+            ),
             widget.guestMode
                 ? _GuestRestrictedTab(
                     title: 'Bookings',
@@ -318,13 +317,6 @@ class _HomePageState extends State<HomePage> {
                     onTap: () => _handleGuestAction('QR scanning'),
                   )
                 : const _ScanTab(),
-            widget.guestMode
-                ? _GuestRestrictedTab(
-                    title: 'Notifications',
-                    icon: Icons.notifications,
-                    onTap: () => _handleGuestAction('notifications'),
-                  )
-                : const NotificationsPage(),
             widget.guestMode
                 ? _GuestRestrictedTab(
                     title: 'Profile',
@@ -522,26 +514,27 @@ class _GuestRestrictedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: Colors.grey[400]),
+            Icon(icon, size: 64, color: colorScheme.outline),
             const SizedBox(height: 16),
             Text(
               '$title not available',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Sign in to access your $title',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             ElevatedButton(onPressed: onTap, child: const Text('Sign in')),
@@ -557,7 +550,7 @@ class _GuestRestrictedTab extends StatelessWidget {
 // ============================================================
 class _HomeContent extends StatefulWidget {
   final bool guestMode;
-  const _HomeContent({this.guestMode = false});
+  const _HomeContent({required this.guestMode});
 
   @override
   State<_HomeContent> createState() => _HomeContentState();
@@ -1253,15 +1246,18 @@ class _HomeContentState extends State<_HomeContent> {
                     ),
                     Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Colors.white, Color(0xFFF5F5F5)],
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.surface,
+                            colorScheme.surfaceContainerHighest,
+                          ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
+                            color: colorScheme.shadow.withValues(alpha: 0.1),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -1272,19 +1268,19 @@ class _HomeContentState extends State<_HomeContent> {
                           Navigator.of(context).pushNamed('/live-map');
                         },
                         style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
+                          foregroundColor: colorScheme.primary,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 8,
                           ),
                           minimumSize: Size.zero,
                         ),
-                        child: const Text(
+                        child: Text(
                           'View Full Map',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
-                            color: AppTheme.primary,
+                            color: colorScheme.primary,
                           ),
                         ),
                       ),
@@ -1739,7 +1735,7 @@ class _HomeContentState extends State<_HomeContent> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Image.asset(
-                      'assets/images/logo.png',
+                      'assets/images/smartride_mark.png',
                       width: 32,
                       height: 32,
                       fit: BoxFit.contain,
@@ -1886,11 +1882,11 @@ class _ToolCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: guestMode ? 0.05 : 0.08),
+          color: colorScheme.surface.withValues(alpha: guestMode ? 0.05 : 0.08),
           border: Border.all(
             color: guestMode
-                ? Colors.white.withValues(alpha: 0.05)
-                : Colors.white.withValues(alpha: 0.15),
+                ? colorScheme.outlineVariant.withValues(alpha: 0.2)
+                : colorScheme.outlineVariant.withValues(alpha: 0.5),
           ),
           borderRadius: BorderRadius.circular(10),
         ),
@@ -1920,7 +1916,7 @@ class _ToolCard extends StatelessWidget {
             Text(
               title,
               style: TextStyle(
-                color: colorScheme.onPrimary,
+                color: colorScheme.onSurface,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -1929,7 +1925,7 @@ class _ToolCard extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                color: colorScheme.onPrimary.withValues(
+                color: colorScheme.onSurfaceVariant.withValues(
                   alpha: guestMode ? 0.4 : 0.72,
                 ),
                 fontSize: 10,
@@ -2051,9 +2047,250 @@ class _BookingsTab extends StatelessWidget {
           child: const Text('Open booking details'),
 >>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
         ),
+        */
       ],
     );
   }
+}
+
+class _BookingList extends StatelessWidget {
+  const _BookingList({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    if (FirebaseAuth.instance.currentUser == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: Text('Sign in to view your bookings.')),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: TransitRepository().myBookings(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            child: Center(
+              child: Text(
+                'Your bookings could not be loaded. Please try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colorScheme.error),
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final bookings = snapshot.data!.docs.toList()
+          ..sort(
+            (left, right) =>
+                _bookingTime(right.data()).compareTo(_bookingTime(left.data())),
+          );
+        if (bookings.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.confirmation_number_outlined,
+                  size: 56,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 12),
+                const Text('You do not have any bookings yet.'),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: bookings
+              .map(
+                (document) => _LiveBookingCard(
+                  bookingId: document.id,
+                  booking: document.data(),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+
+  static DateTime _bookingTime(Map<String, dynamic> booking) {
+    final updatedAt = booking['updatedAt'];
+    final createdAt = booking['createdAt'];
+    if (updatedAt is Timestamp) return updatedAt.toDate();
+    if (createdAt is Timestamp) return createdAt.toDate();
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+}
+
+class _LiveBookingCard extends StatelessWidget {
+  const _LiveBookingCard({required this.bookingId, required this.booking});
+
+  final String bookingId;
+  final Map<String, dynamic> booking;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final status = booking['status']?.toString() ?? 'unknown';
+    final statusInfo = _bookingStatus(status, colors);
+    final seats = (booking['seats'] as List<dynamic>? ?? const [])
+        .map((seat) => seat.toString())
+        .join(', ');
+    final busNumber = booking['busNumber']?.toString().trim();
+    final routeName = booking['routeName']?.toString().trim();
+    final pickupName = booking['pickupStopName']?.toString().trim();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BookingStatusPage(bookingId: bookingId),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: statusInfo.color.withValues(alpha: 0.14),
+                    child: Icon(statusInfo.icon, color: statusInfo.color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      busNumber?.isNotEmpty == true
+                          ? 'Bus $busNumber'
+                          : 'Bus details unavailable',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Chip(
+                    label: Text(statusInfo.label),
+                    labelStyle: TextStyle(
+                      color: statusInfo.color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    backgroundColor: statusInfo.color.withValues(alpha: 0.12),
+                    side: BorderSide.none,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _detailLine(
+                context,
+                Icons.route_outlined,
+                routeName?.isNotEmpty == true
+                    ? routeName!
+                    : 'Route unavailable',
+              ),
+              const SizedBox(height: 8),
+              _detailLine(
+                context,
+                Icons.location_on_outlined,
+                pickupName?.isNotEmpty == true
+                    ? 'Pickup: $pickupName'
+                    : 'Pickup stop unavailable',
+              ),
+              const SizedBox(height: 8),
+              _detailLine(
+                context,
+                Icons.event_seat_outlined,
+                seats.isNotEmpty ? 'Seat(s): $seats' : 'Seat unavailable',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'UGX ${booking['fare'] ?? 0}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const Spacer(),
+                  Text(
+                    status == 'confirmed' ? 'View ticket' : 'View booking',
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: colors.primary),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _detailLine(BuildContext context, IconData icon, String text) =>
+      Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      );
+
+  static _BookingStatusInfo _bookingStatus(String status, ColorScheme scheme) =>
+      switch (status) {
+        'confirmed' => const _BookingStatusInfo(
+          'Confirmed',
+          Icons.check_circle_outline,
+          Colors.green,
+        ),
+        'pending_confirmation' => _BookingStatusInfo(
+          'Awaiting bus',
+          Icons.hourglass_top_outlined,
+          Colors.orange.shade800,
+        ),
+        'cancelled' => _BookingStatusInfo(
+          'Cancelled',
+          Icons.cancel_outlined,
+          scheme.error,
+        ),
+        'expired' => _BookingStatusInfo(
+          'Expired',
+          Icons.timer_off_outlined,
+          scheme.onSurfaceVariant,
+        ),
+        _ => _BookingStatusInfo(
+          'Updated',
+          Icons.info_outline,
+          scheme.onSurfaceVariant,
+        ),
+      };
+}
+
+class _BookingStatusInfo {
+  const _BookingStatusInfo(this.label, this.icon, this.color);
+
+  final String label;
+  final IconData icon;
+  final Color color;
 }
 
 class _ScanTab extends StatefulWidget {
@@ -2083,7 +2320,7 @@ class _ScanTabState extends State<_ScanTab> {
             });
             if (mounted) {
               ScaffoldMessenger.of(
-                context,
+                this.context,
               ).showSnackBar(const SnackBar(content: Text('Ticket scanned.')));
             }
           },

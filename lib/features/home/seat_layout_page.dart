@@ -99,48 +99,44 @@ class _SeatLayoutPageState extends State<SeatLayoutPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final busData = snapshot.data!.data();
-            final totalSeats = (busData?['totalSeats'] as num?)?.toInt() ?? 32;
-            final reservedSeats = List<String>.from(
-              busData?['reservedSeats'] as List<dynamic>? ?? const [],
-            );
-            final farePerSeat =
-                (busData?['farePerSeat'] as num?)?.toInt() ?? 3000;
-            final seats = List.generate(
-              totalSeats,
-              (i) => (i + 1).toString().padLeft(2, '0'),
-            );
+          final busData = snapshot.data!.data();
+          final totalSeats = (busData?['totalSeats'] as num?)?.toInt() ?? 32;
+          final reservedSeats = List<String>.from(
+            busData?['reservedSeats'] as List<dynamic>? ?? const [],
+          );
+          final pendingSeats = List<String>.from(
+            busData?['pendingSeats'] as List<dynamic>? ?? const [],
+          );
+          final farePerSeat =
+              (busData?['farePerSeat'] as num?)?.toInt() ?? 3000;
+          final seats = List.generate(
+            totalSeats,
+            (i) => (i + 1).toString().padLeft(2, '0'),
+          );
 
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text(
-                        'Select a seat',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      Text('Front'),
-                    ],
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+                child: _SeatHeader(busNumber: widget.busNumber),
+              ),
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppTheme.grey100),
                   ),
-                ),
-                Expanded(
                   child: GridView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
+                    padding: EdgeInsets.zero,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 4,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 1.2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.08,
                         ),
                     itemCount: seats.length,
                     itemBuilder: (context, index) {
@@ -351,38 +347,138 @@ class _SeatLayoutPageState extends State<SeatLayoutPage> {
 >>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
                   ),
                 ),
-                if (selectedSeats.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
+              ),
+              if (selectedSeats.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                  decoration: const BoxDecoration(color: AppTheme.white),
+                  child: SafeArea(
+                    top: false,
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ConfirmSeatPage(
-                                busId: widget.busId,
-                                routeId: widget.routeId,
-                                busNumber: widget.busNumber,
-                                farePerSeat: farePerSeat,
-                                seats: selectedSeats.toList(),
-                              ),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ConfirmSeatPage(
+                              busId: widget.busId,
+                              routeId: widget.routeId,
+                              busNumber: widget.busNumber,
+                              farePerSeat: farePerSeat,
+                              seats: selectedSeats.toList(),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                         child: Text(
-                          'Continue â€” ${selectedSeats.length} ${selectedSeats.length == 1 ? 'seat' : 'seats'}',
+                          'Continue — ${selectedSeats.length} ${selectedSeats.length == 1 ? 'seat' : 'seats'}',
                         ),
                       ),
                     ),
                   ),
-              ],
-            );
-          },
+                ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+class _SeatHeader extends StatelessWidget {
+  const _SeatHeader({required this.busNumber});
+  final String busNumber;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppTheme.primarySoft,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.directions_bus_rounded,
+                  color: AppTheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Choose your seat',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Bus $busNumber  •  Driver at the front',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          const Wrap(
+            spacing: 14,
+            runSpacing: 10,
+            children: [
+              _SeatLegend(label: 'Available', color: AppTheme.white),
+              _SeatLegend(label: 'Selected', color: AppTheme.primary),
+              _SeatLegend(label: 'Reserved', color: AppTheme.grey100),
+              _SeatLegend(label: 'Occupied', color: AppTheme.grey300),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _SeatLegend extends StatelessWidget {
+  const _SeatLegend({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(
+            color: color == AppTheme.white
+                ? AppTheme.grey300
+                : Colors.transparent,
+          ),
         ),
       ),
-    );
-  }
+      const SizedBox(width: 6),
+      Text(
+        label,
+        style: const TextStyle(
+          color: AppTheme.grey700,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
 }
 
 class _SeatLegend extends StatelessWidget {

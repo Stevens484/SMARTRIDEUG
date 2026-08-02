@@ -28,6 +28,7 @@ class _DestinationPageState extends State<DestinationPage> {
     ).padding.bottom; // 🔥 Get system bottom padding
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: const Text('Choose Destination'), elevation: 0),
       body: SafeArea(
         child: Padding(
@@ -46,11 +47,14 @@ class _DestinationPageState extends State<DestinationPage> {
                   filled: true,
                   fillColor: Theme.of(context).colorScheme.surface,
                 ),
-                onChanged: (value) {
-                  setState(() => _searchQuery = value.toLowerCase());
-                },
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
               ),
-              const SizedBox(height: 16),
+              onChanged: (value) {
+                setState(() => _searchQuery = value.trim().toLowerCase());
+              },
+            ),
+            const SizedBox(height: 16),
 
               // 🔥 Routes List (Expanded = takes all remaining space)
               Expanded(
@@ -139,48 +143,130 @@ class _DestinationPageState extends State<DestinationPage> {
                             ),
                           ],
                         ),
-                      );
-                    }
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => setState(() {}),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                    return ListView.builder(
-                      itemCount: filteredRoutes.length,
-                      itemBuilder: (context, index) {
-                        final route = filteredRoutes[index];
-                        final data = route.data();
-                        final title = data['name']?.toString() ?? route.id;
-                        final subtitle =
-                            data['subtitle']?.toString() ??
-                            [
-                              data['origin'],
-                              data['destination'],
-                            ].whereType<String>().join(' → ');
-                        final distance =
-                            data['distance']?.toString() ?? 'Unknown';
-                        final duration =
-                            data['duration']?.toString() ?? 'Unknown';
-                        final available =
-                            data['activeBuses']?.toString() ??
-                            data['busCount']?.toString() ??
-                            '0';
+                final routes = snapshot.data!.docs;
 
-                        return _RouteCard(
-                          title: title,
-                          subtitle: subtitle,
-                          distance: distance,
-                          duration: duration,
-                          busesAvailable: int.tryParse(available) ?? 0,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    RouteDetailsPage(routeId: route.id),
-                              ),
-                            );
-                          },
+                // 🔥 Filter routes based on search query
+                final filteredRoutes =
+                    routes.where((route) {
+                      final data = route.data();
+                      if (data['active'] == false || data['disabled'] == true) {
+                        return false;
+                      }
+                      return _searchQuery.isEmpty ||
+                          _matchesDestination(data, _searchQuery);
+                    }).toList()..sort(
+                      (a, b) =>
+                          _matchRank(a.data()).compareTo(_matchRank(b.data())),
+                    );
+
+                if (filteredRoutes.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'No routes available'
+                              : 'No routes travel to "$_searchQuery"',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'Check back later for new routes'
+                              : 'Try a nearby destination, route name, or code',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredRoutes.length,
+                  itemBuilder: (context, index) {
+                    final route = filteredRoutes[index];
+                    final data = route.data();
+                    final title = data['name']?.toString() ?? route.id;
+                    final subtitle =
+                        data['subtitle']?.toString() ??
+                        [
+                          data['origin'],
+                          data['destination'],
+                        ].whereType<String>().join(' → ');
+                    final distance = data['distance']?.toString() ?? 'Unknown';
+                    final duration = data['duration']?.toString() ?? 'Unknown';
+                    return _RouteCard(
+                      routeId: route.id,
+                      title: title,
+                      subtitle: subtitle,
+                      distance: distance,
+                      duration: duration,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RouteDetailsPage(routeId: route.id),
+                          ),
                         );
                       },
                     );
                   },
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            // 🔥 Info Card
+            Card(
+              elevation: 0,
+              color: Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Live updates: Bus locations and seat availability are updated in real time.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -453,36 +539,60 @@ class _RouteCard extends StatelessWidget {
                         fontSize: 16,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
+                  ),
+                  const SizedBox(width: 12),
+
+                  // 🔥 Route Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.place, size: 14, color: Colors.grey[500]),
-                        const SizedBox(width: 4),
                         Text(
-                          distance,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: Colors.grey[500],
-                        ),
-                        const SizedBox(width: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          duration,
+                          subtitle,
                           style: TextStyle(
-                            fontSize: 12,
                             color: Colors.grey[600],
+                            fontSize: 14,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.place,
+                              size: 14,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              distance,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              duration,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -566,8 +676,8 @@ class _RouteCard extends StatelessWidget {
               ],
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

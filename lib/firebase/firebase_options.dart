@@ -2,11 +2,13 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 
 class DefaultFirebaseOptions {
   static const FirebaseOptions currentPlatform = FirebaseOptions(
-    apiKey: 'AIzaSyCTatcEGfyuDDz0XsZvR9M4-VTwxobdkec',
-    appId: '1:176470873537:android:0c660378b99db9407fcb40',
-    messagingSenderId: '176470873537',
-    projectId: 'smartrideug-fahad',
-    authDomain: 'smartrideug-fahad.firebaseapp.com',
-    storageBucket: 'smartrideug-fahad.firebasestorage.app',
+    apiKey: 'AIzaSyAmNXXFiqPUH-SspNPRUG11cktszM6Ls7M',
+    appId: '1:398858755798:android:08b91bf10b904b6b30b377',
+    messagingSenderId: '398858755798',
+    projectId: 'smartride-mobileapp001',
+    authDomain: 'smartride-mobileapp001.firebaseapp.com',
+    databaseURL:
+        'https://smartride-mobileapp001-default-rtdb.europe-west1.firebasedatabase.app',
+    storageBucket: 'smartride-mobileapp001.firebasestorage.app',
   );
 }

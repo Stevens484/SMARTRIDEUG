@@ -124,6 +124,28 @@ class AuthenticationService {
     return credential;
   }
 
+  /// Claims the one-time passenger welcome notification for this account.
+  /// A transaction prevents it from being shown again on later sign-ins.
+  Future<bool> claimWelcomeNotification() async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) return false;
+    final userRef = _db.collection('users').doc(user.uid);
+    var claimed = false;
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(userRef);
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null || data['role'] != 'passenger') {
+        return;
+      }
+      if (data['welcomeNotificationSentAt'] != null) return;
+      transaction.update(userRef, {
+        'welcomeNotificationSentAt': FieldValue.serverTimestamp(),
+      });
+      claimed = true;
+    });
+    return claimed;
+  }
+
   Future<void> createStaffAccount({
     required String name,
     required String email,
@@ -146,7 +168,9 @@ class AuthenticationService {
         'email': email.trim(),
         'role': role,
         'employeeId': employeeId.trim(),
+        'disabled': false,
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       await secondaryAuth.signOut();
     } finally {

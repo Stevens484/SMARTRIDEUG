@@ -1,26 +1,45 @@
 {
   "project_info": {
-    "project_number": "176470873537",
-    "project_id": "smartrideug-fahad",
-    "storage_bucket": "smartrideug-fahad.firebasestorage.app"
+    "project_number": "398858755798",
+    "firebase_url": "https://smartride-mobileapp001-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "smartride-mobileapp001",
+    "storage_bucket": "smartride-mobileapp001.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:176470873537:android:0c660378b99db9407fcb40",
+        "mobilesdk_app_id": "1:398858755798:android:08b91bf10b904b6b30b377",
         "android_client_info": {
-          "package_name": "com.example.smart_ride_ug"
+          "package_name": "com.example.smartrideug"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "398858755798-430gr7t8ltl9n3csgj6jon3pd2mklirl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smartrideug",
+            "certificate_hash": "c46dc067fd6ddf2bcc7eee92a4699767356c408d"
+          }
+        },
+        {
+          "client_id": "398858755798-ddm49pnamh68fbb92okl2ql1bvkebm53.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyCTatcEGfyuDDz0XsZvR9M4-VTwxobdkec"
+          "current_key": "AIzaSyAmNXXFiqPUH-SspNPRUG11cktszM6Ls7M"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398858755798-ddm49pnamh68fbb92okl2ql1bvkebm53.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

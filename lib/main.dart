@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smartrideug/core/theme/app_theme.dart';
 import 'package:smartrideug/core/theme/theme_notifier.dart';
+import 'package:smartrideug/core/services/local_notification_service.dart';
 import 'package:smartrideug/firebase/firebase_initializer.dart';
 import 'package:smartrideug/firebase/firebase_options.dart';
 import 'package:smartrideug/features/authentication/splash_page.dart';
@@ -11,6 +12,7 @@ void main() async {
   await FirebaseInitializer.initialize(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await LocalNotificationService.instance.initialize();
   runApp(const SmartRideApp());
 }
 

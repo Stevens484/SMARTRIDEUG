@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 <<<<<<< HEAD
 import 'package:smartrideug/core/models/stop_model.dart';
@@ -806,7 +807,44 @@ class _BusInfoSheet extends StatelessWidget {
           );
         },
       ),
-    );
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: buses
+            .map(
+              (bus) => ListTile(
+                dense: true,
+                leading: Icon(Icons.directions_bus, color: bus.seatColor),
+                title: Text(bus.id),
+                subtitle: Text(bus.routeName),
+                trailing: Text('${bus.availableSeats} seats'),
+                onTap: () => _showBusDetails(bus),
+              ),
+            )
+            .toList(),
+      ),
+    ),
+  );
+}
+
+class _ConfiguredRoutePolylines extends StatefulWidget {
+  const _ConfiguredRoutePolylines({required this.routes});
+
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> routes;
+
+  @override
+  State<_ConfiguredRoutePolylines> createState() =>
+      _ConfiguredRoutePolylinesState();
+}
+
+class _ConfiguredRoutePolylinesState extends State<_ConfiguredRoutePolylines> {
+  final _geometryService = RouteGeometryService();
+  late Future<List<_MapRouteLine>> _routeLines;
+  late String _routeSignature;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoutes();
   }
 =======
         builder: (context, routeSnapshot) {

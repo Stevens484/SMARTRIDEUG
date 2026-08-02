@@ -215,6 +215,56 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
 >>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   }
 
+  Future<bool> _requestLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      if (mounted) {
+        setState(
+          () => _locationMessage =
+              'Turn on location services before starting your trip.',
+        );
+      }
+      return false;
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(
+          () => _locationMessage =
+              'Location permission is required to share the bus position.',
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _markOffline(DocumentReference<Map<String, dynamic>> bus) async {
+    try {
+      await bus.update({
+        'status': 'offline',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Preserve the original location error for the driver.
+    }
+  }
+
+  Future<void> _publishPosition(
+    DocumentReference<Map<String, dynamic>> bus,
+    Position position,
+  ) => bus.update({
+    'latitude': position.latitude,
+    'longitude': position.longitude,
+    'speed': position.speed.isFinite ? position.speed : 0,
+    'heading': position.heading.isFinite ? position.heading : 0,
+    'status': 'moving',
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -278,8 +328,8 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Passengers waiting',
-          style: Theme.of(context).textTheme.titleLarge,
+          'Your assigned trip',
+          style: Theme.of(context).textTheme.headlineSmall,
         ),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
@@ -651,6 +701,27 @@ class _PickupLocationSheet extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DriverMessage extends StatelessWidget {
+  const _DriverMessage({required this.icon, required this.message});
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 58, color: AppTheme.primary),
+          const SizedBox(height: 16),
+          Text(message, textAlign: TextAlign.center),
+        ],
+      ),
     ),
   );
 }

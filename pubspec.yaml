@@ -37,6 +37,7 @@ dependencies:
   cloud_firestore: ^6.7.1
   firebase_messaging: ^16.4.3
   cloud_functions: ^6.3.5
+  flutter_local_notifications: ^22.2.0
   firebase_storage: ^13.0.6
 <<<<<<< HEAD
   flutter_map: ^8.3.1
@@ -87,8 +88,9 @@ flutter:
 >>>>>>> 8a93349 (Update SmartRide app features and Firebase integration)
   uses-material-design: true
   assets:
-    - assets/images/logo.png
-    - assets/images/landing_bg.png
+    - assets/images/smartride_wordmark.png
+    - assets/images/smartride_mark.png
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:

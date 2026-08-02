@@ -1,10 +1,88 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:smartrideug/core/theme/app_theme.dart';
 
 class PaymentMethodPage extends StatefulWidget {
   const PaymentMethodPage({super.key});
+
+  CollectionReference<Map<String, dynamic>> _methods(String uid) =>
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('paymentMethods');
+
+  Future<void> _addMomo(BuildContext context, String uid) async {
+    final phone = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add MTN MoMo'),
+        content: TextField(
+          controller: phone,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(
+            labelText: 'MTN mobile number',
+            hintText: '0770 000 000',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    final digits = phone.text.replaceAll(RegExp(r'\D'), '');
+    if (saved != true || digits.length < 9) {
+      phone.dispose();
+      if (saved == true && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid MTN mobile number.')),
+        );
+      }
+      return;
+    }
+    final methods = _methods(uid);
+    final existing = await methods.get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final method in existing.docs) {
+      batch.update(method.reference, {
+        'isDefault': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    batch.set(methods.doc(), {
+      'provider': 'mtn_momo_simulated',
+      'title': 'MTN MoMo',
+      'phone': phone.text.trim(),
+      'subtitle': 'MTN number ending ${digits.substring(digits.length - 4)}',
+      'isDefault': true,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    phone.dispose();
+  }
+
+  Future<void> _makeDefault(
+    String uid,
+    DocumentReference<Map<String, dynamic>> selected,
+  ) async {
+    final methods = await _methods(uid).get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final method in methods.docs) {
+      batch.update(method.reference, {
+        'isDefault': method.reference.path == selected.path,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
 
   @override
   State<PaymentMethodPage> createState() => _PaymentMethodPageState();
@@ -77,30 +155,22 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid;
-
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Payment Method')),
-        body: const Center(child: Text('Sign in to view payment methods.')),
+      return const Scaffold(
+        body: Center(child: Text('Sign in to manage payment methods.')),
       );
     }
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment Method')),
+      appBar: AppBar(title: const Text('Payment method')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('paymentMethods')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream: _methods(
+          uid,
+        ).orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final methods = snapshot.data!.docs;
           return ListView.separated(
             padding: const EdgeInsets.all(16.0),
